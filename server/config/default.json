@@ -1,0 +1,131 @@
+{
+  "global": {
+    "loglevel": "info",
+    "sessionSecret": "REPLACE_ME_ON_FIRST_RUN",
+    "frontPopupEnable": false,
+    "frontPopupTitle": "",
+    "frontPopupContent": "",
+    "searchLocation": "bottom",
+    "theme": "default",
+    "monitorName": "PagerMon",
+    "faKey": "changeme"
+  },
+  "database": {
+    "file": "./messages.db",
+    "type": "sqlite3",
+    "aliasRefreshInterval": "0 5,35 * * * *"
+  },
+  "messages": {
+    "maxLimit": 120,
+    "defaultLimit": 20,
+    "duplicateFiltering": true,
+    "duplicateLimit": 10,
+    "duplicateTime": 60,
+    "rotationEnabled": true,
+    "rotateDays": 7,
+    "rotateKeep": 4,
+    "replaceText": [],
+    "pdwMode": false,
+    "adminShow": false,
+    "HideCapcode": false,
+    "HideSource": false,
+    "apiSecurity": false
+  },
+  "auth": {
+    "registration": false,
+    "user": "admin",
+    "encPass": "$2a$08$De/aXnQkZIEbQ9p8J22tHuzLltqIbsAxE2CGgRMPLaaIwwHmVrpsu",
+    "keys": [
+      {
+        "name": "example1",
+        "key": "REPLACE_WITH_YOUR_API_KEY",
+        "selected": false
+      }
+    ]
+  },
+  "monitoring": {
+    "azureEnable": false,
+    "azureKey": "",
+    "gaEnable": false,
+    "gaTrackingCode": ""
+  },
+  "plugins": {
+    "Discord": {
+      "enable": false
+    },
+    "Pushover": {
+      "enable": false,
+      "pushAPIKEY": ""
+    },
+    "Prowl": {
+      "enable": false
+    },
+    "Telegram": {
+      "enable": false,
+      "teleAPIKEY": ""
+    },
+    "Slack": {
+      "enable": false
+    },
+    "Gotify": {
+      "enable": false
+    },
+    "SMTP": {
+      "enable": false,
+      "mailFrom": "pager@example.com",
+      "mailFromName": "PagerMon",
+      "server": "",
+      "port": "587",
+      "secure": true,
+      "password": ""
+    },
+    "Ntfy": {
+      "enable": false,
+      "serverUrl": "https://ntfy.sh",
+      "topic": "",
+      "title": "PagerMon Alert",
+      "priority": 3,
+      "tags": "pager",
+      "accessToken": ""
+    },
+    "Filter": {
+      "enable": false,
+      "ignoreMessage": ""
+    },
+    "RegexReplace": {
+      "enable": false,
+      "regexReplaceMatchRegex": "",
+      "regexReplaceString": ""
+    },
+    "MessageRepeat": {
+      "enable": false
+    },
+    "SimpleWebhook": {
+      "enable": false,
+      "URL": "",
+      "filterMode": {
+        "value": "0",
+        "text": "Per alias only"
+      },
+      "sendMessage": false,
+      "sendAddress": false,
+      "sendAgency": false,
+      "sendAlias": false,
+      "sendIcon": false,
+      "sendColor": false
+    },
+    "AdvancedWebhook": {
+      "enable": false,
+      "URL": "",
+      "contentType": "application/json",
+      "filterMode": {
+        "value": "2",
+        "text": "All messages"
+      },
+      "contentTemplate": ""
+    },
+    "Template": {
+      "enable": false
+    }
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "name": "FirePageWebhook",
+  "description": "Webhook forwarder — sends messages to n8n or any HTTP endpoint. Deduplication is controlled via global Settings.",
+  "disable": false,
+  "trigger": "message",
+  "scope": "after",
+  "config": [
+    {
+      "name": "webhookURL",
+      "label": "Webhook URL",
+      "description": "Destination URL to POST messages to",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "authToken",
+      "label": "Authorization Token",
+      "description": "Value for the Authorization header (n8n mode). Leave blank if not required.",
+      "type": "text"
+    },
+    {
+      "name": "mode",
+      "label": "Webhook Mode",
+      "description": "n8n: sends full message JSON with Authorization header. Generic: use custom headers and payload template.",
+      "type": "select",
+      "options": [
+        {"value": "n8n", "text": "n8n"},
+        {"value": "generic", "text": "Generic"}
+      ],
+      "required": true
+    },
+    {
+      "name": "genericHeaders",
+      "label": "Custom Headers (JSON)",
+      "description": "Generic mode only. JSON object of headers to send, e.g. {\"X-Api-Key\": \"abc\"}",
+      "type": "text"
+    },
+    {
+      "name": "genericPayloadTemplate",
+      "label": "Payload Template",
+      "description": "Generic mode only. Template string with {field} placeholders. Available fields: address, message, source, timestamp, alias, agency, icon, color",
+      "type": "text"
+    }
+  ],
+  "aliasConfig": []
+}

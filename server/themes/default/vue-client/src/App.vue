@@ -1,0 +1,129 @@
+<template>
+  <nav class="navbar navbar-expand-lg fixed-top">
+    <div class="container-fluid">
+      <a class="navbar-brand fw-bold" href="/">{{ monitorName }}</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon" style="filter: invert(1);"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="mainNav">
+        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+          <li class="nav-item">
+            <router-link class="nav-link" to="/">
+              <i class="bi bi-house-fill me-1"></i>Home
+            </router-link>
+          </li>
+          <li v-if="isLoggedIn" class="nav-item">
+            <router-link class="nav-link" to="/livelog">
+              <i class="bi bi-terminal-fill me-1"></i>Live Log
+            </router-link>
+          </li>
+          <li v-if="isAdmin" class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              <i class="bi bi-shield-lock-fill me-1"></i>Admin
+            </a>
+            <ul class="dropdown-menu dropdown-menu-dark">
+              <li><router-link class="dropdown-item" to="/admin/aliases"><i class="bi bi-card-list me-2"></i>Aliases</router-link></li>
+              <li><router-link class="dropdown-item" to="/admin/users"><i class="bi bi-people-fill me-2"></i>Users</router-link></li>
+              <li><hr class="dropdown-divider"></li>
+              <li><router-link class="dropdown-item" to="/admin/settings"><i class="bi bi-gear-fill me-2"></i>Settings</router-link></li>
+            </ul>
+          </li>
+        </ul>
+        <ul class="navbar-nav ms-auto mb-2 mb-lg-0 align-items-center">
+          <li class="nav-item me-2">
+            <button class="btn btn-sm btn-outline-secondary" @click="toggleDark" :title="dark ? 'Light mode' : 'Dark mode'">
+              <i :class="dark ? 'bi bi-sun-fill' : 'bi bi-moon-fill'"></i>
+            </button>
+          </li>
+          <template v-if="isLoggedIn">
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="bi bi-person-circle me-1"></i>{{ username }}
+              </a>
+              <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark">
+                <li><router-link class="dropdown-item" to="/auth/profile"><i class="bi bi-person-fill me-2"></i>My Profile</router-link></li>
+                <li><router-link class="dropdown-item" to="/auth/reset"><i class="bi bi-key-fill me-2"></i>Reset Password</router-link></li>
+              </ul>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="/auth/logout"><i class="bi bi-box-arrow-right me-1"></i>Sign Out</a>
+            </li>
+          </template>
+          <template v-else>
+            <li v-if="registrationEnabled" class="nav-item">
+              <router-link class="nav-link" to="/auth/register"><i class="bi bi-person-plus-fill me-1"></i>Register</router-link>
+            </li>
+            <li class="nav-item">
+              <router-link class="nav-link" to="/auth/login"><i class="bi bi-box-arrow-in-right me-1"></i>Sign In</router-link>
+            </li>
+          </template>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <router-view />
+
+  <!-- Toast container -->
+  <div class="toast-container-custom">
+    <div v-for="t in toasts" :key="t.id" class="toast show align-items-center border-0 mb-2" :class="`text-bg-${t.type}`" role="alert">
+      <div class="d-flex">
+        <div class="toast-body">{{ t.msg }}</div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" @click="removeToast(t.id)"></button>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, computed, onMounted, provide } from 'vue'
+import { useAuthStore } from './stores/auth.js'
+
+const auth = useAuthStore()
+
+const dark = ref(localStorage.getItem('pm-theme') === 'dark')
+const toasts = ref([])
+let toastId = 0
+
+function toggleDark() {
+  dark.value = !dark.value
+  const theme = dark.value ? 'dark' : 'light'
+  document.documentElement.setAttribute('data-theme', theme)
+  localStorage.setItem('pm-theme', theme)
+}
+
+function addToast(msg, type = 'success', duration = 4000) {
+  const id = ++toastId
+  toasts.value.push({ id, msg, type })
+  if (duration) setTimeout(() => removeToast(id), duration)
+}
+
+function removeToast(id) {
+  toasts.value = toasts.value.filter(t => t.id !== id)
+}
+
+provide('toast', addToast)
+
+const monitorName = ref('PagerMon')
+const isLoggedIn = computed(() => auth.authenticated)
+const isAdmin = computed(() => auth.user?.role === 'admin')
+const username = computed(() => auth.user?.username || '')
+const registrationEnabled = ref(false)
+
+onMounted(async () => {
+  const saved = localStorage.getItem('pm-theme') || 'light'
+  document.documentElement.setAttribute('data-theme', saved)
+  dark.value = saved === 'dark'
+
+  await auth.fetchMe()
+
+  try {
+    const r = await fetch('/api/appconfig')
+    if (r.ok) {
+      const d = await r.json()
+      monitorName.value = d.monitorName || 'PagerMon'
+      registrationEnabled.value = !!d.registration
+    }
+  } catch (_) {}
+})
+</script>

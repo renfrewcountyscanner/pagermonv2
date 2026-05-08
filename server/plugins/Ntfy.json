@@ -1,0 +1,71 @@
+{
+  "name": "Ntfy",
+  "description": "Send push notifications via ntfy.sh (public or self-hosted)",
+  "disable": false,
+  "trigger": "message",
+  "scope": "after",
+  "config": [
+    {
+      "name": "serverUrl",
+      "label": "Server URL",
+      "description": "ntfy server URL (e.g., https://ntfy.sh or your self-hosted instance)",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "topic",
+      "label": "Topic",
+      "description": "The ntfy topic to publish to",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "title",
+      "label": "Title",
+      "description": "Notification title. Supports placeholders: {alias}, {message}, {address}, {agency}",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "priority",
+      "label": "Priority",
+      "description": "Notification priority (1=min, 3=default, 5=max)",
+      "type": "number",
+      "required": false
+    },
+    {
+      "name": "tags",
+      "label": "Tags",
+      "description": "Comma-separated tags (e.g., pager,alert)",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "accessToken",
+      "label": "Access Token",
+      "description": "Bearer token for protected topics (leave blank for public topics)",
+      "type": "text",
+      "required": false
+    },
+    {
+      "name": "filterMode",
+      "label": "Filter Mode",
+      "description": "Which messages should be sent?",
+      "type": "select",
+      "options": [
+        {"value": "0", "text": "Per alias only"},
+        {"value": "1", "text": "Defined aliases"},
+        {"value": "2", "text": "All messages"}
+      ],
+      "required": true
+    }
+  ],
+  "aliasConfig": [
+    {
+      "name": "enable",
+      "label": "Enable ntfy",
+      "description": "Send ntfy notifications for this alias",
+      "type": "checkbox"
+    }
+  ]
+}
