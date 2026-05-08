@@ -194,12 +194,12 @@ var sessSet = {
     cookie: {
         maxAge: 7 * 24 * 60 * 60 * 1000, // 1 week
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production' && !process.env.DISABLE_SECURE_COOKIE,
+        secure: false, // set to true only when running HTTPS directly; proxy handles SSL
         sameSite: 'lax'
     },
     store: new SQLiteStore,
-    saveUninitialized: false,
-    resave: false,
+    saveUninitialized: true,
+    resave: true,
     secret: secret,
     name: 'pagermon.sid'
 }
