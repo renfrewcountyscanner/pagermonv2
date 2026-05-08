@@ -126,9 +126,10 @@ router.route('/login')
         });
 
 router.route('/logout').get(authHelper.isLoggedIn, function(req, res) {
-        req.logout();
-        res.redirect('/');
-        logger.auth.debug(`Successful Logout ${req.user.username}`);
+	var username = req.user && req.user.username;
+	req.logout();
+	res.redirect('/');
+	logger.auth.debug(`Successful Logout ${username}`);
 });
 
 router.route('/profile/').get(authHelper.isLoggedIn, function(req, res) {

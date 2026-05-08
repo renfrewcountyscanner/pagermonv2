@@ -32,11 +32,15 @@ The UI is built on a Node/Express/Vue 3/Bootstrap stack, while the client script
 
 ## Screenshots
 
-![main view](http://i.imgur.com/QWKoJjb.jpeg)
+The UI has been rebuilt with Vue 3 and Bootstrap 5. See the live demo or your local install for current screenshots.
 
-![desktop view](http://i.imgur.com/Zik74Dl.jpeg)
-
-![alias edit](http://i.imgur.com/gus8QTe.jpeg)
+> **Note:** Replace the placeholder links below with screenshots from your own instance.
+>
+> - Main Messages View: `/`
+> - Live Log View: `/livelog`
+> - Admin Settings: `/admin`
+>
+> Live instance: [https://pagermonv2.firepage.ca](https://pagermonv2.firepage.ca)
 
 ---
 

@@ -82,6 +82,8 @@ client/config/backup.json
 # sqlite
 
 *.db
+*.db.bak
+*.db-journal
 
 # cloud9
 

@@ -1,6 +1,7 @@
 const passport = require('passport');
 const LocalStrategy = require('passport-local').Strategy;
 const LocalAPIKeyStrategy = require('passport-localapikey-update').Strategy;
+const crypto = require('crypto');
 
 const nconf = require('nconf');
 const logger = require('../log');
@@ -42,14 +43,18 @@ passport.use(
         new LocalAPIKeyStrategy(function(apikey, done) {
                 nconf.load();
                 const auth = nconf.get('auth');
-                const key = auth.keys.find(x => x.key === apikey);
-                // var key = auth.keys.find({ key: apikey });
-                if (key) {
-                        // do a bcrypt compare
-                        if (apikey == key.key) {
-                                return done(null, key.name);
+                const keys = auth.keys || [];
+                for (const key of keys) {
+                    // timing-safe comparison to prevent side-channel attacks
+                    try {
+                        const a = Buffer.from(apikey, 'utf8');
+                        const b = Buffer.from(key.key, 'utf8');
+                        if (a.length === b.length && crypto.timingSafeEqual(a, b)) {
+                            return done(null, key.name);
                         }
-                        return done(null, false);
+                    } catch (_) {
+                        // length mismatch or other error, skip
+                    }
                 }
                 return done(null, false);
         })
