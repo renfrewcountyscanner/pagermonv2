@@ -1,6 +1,6 @@
 var fs = require('fs');
 var logger = require('./log');
-var moment = require('moment');
+var moment = require('dayjs');
 var nconf = require('nconf');
 var confFile = './config/config.json';
 var db = require('./knex/knex.js');

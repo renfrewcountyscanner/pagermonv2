@@ -1,7 +1,7 @@
 process.env.NODE_ENV = 'test';
 
 const chai = require('chai');
-const moment = require('moment');
+const moment = require('dayjs');
 
 const should = chai.should();
 const chaiHttp = require('chai-http');

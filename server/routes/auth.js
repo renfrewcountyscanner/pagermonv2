@@ -3,7 +3,7 @@ const path = require('path');
 
 const router = express.Router();
 const bcrypt = require('bcryptjs');
-const moment = require('moment');
+const moment = require('dayjs');
 const nconf = require('nconf');
 
 const confFile = './config/config.json';
