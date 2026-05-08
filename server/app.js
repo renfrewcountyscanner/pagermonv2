@@ -20,8 +20,9 @@ var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
 var fs = require('fs');
 var session = require('express-session');
-var request = require('request');
 var SQLiteStore = require('connect-sqlite3')(session);
+var cors = require('cors');
+var rateLimit = require('express-rate-limit');
 var flash    = require('connect-flash');
 
 
@@ -39,6 +40,11 @@ if( ! fs.existsSync(confFile) ) {
 }
 // load the config file
 var nconf = require('nconf');
+    nconf.env({
+        separator: '__',
+        lowerCase: true,
+        parseValues: true
+    });
     nconf.file({file: confFile});
     nconf.load();
 
@@ -144,21 +150,58 @@ var secret = nconf.get('global:sessionSecret');
 // compress all responses
 app.use(compression());
 app.use(require("morgan")("combined", { "stream": logger.http.stream }));
+
+// CORS - restrict to known origins in production
+var corsOrigins = nconf.get('global:corsOrigins') || ['http://localhost:3000', 'http://127.0.0.1:3000'];
+if (process.env.CORS_ORIGINS) {
+    corsOrigins = process.env.CORS_ORIGINS.split(',').map(s => s.trim());
+}
+app.use(cors({
+    origin: corsOrigins,
+    credentials: true
+}));
+
+// Rate limiting
+var limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: nconf.get('global:rateLimit') || 300,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many requests, please try again later.' }
+});
+app.use(limiter);
+
+// Stricter rate limit for message ingestion
+var messageLimiter = rateLimit({
+    windowMs: 60 * 1000, // 1 minute
+    max: nconf.get('messages:rateLimit') || 120,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Message rate limit exceeded.' }
+});
+app.use('/api/messages', messageLimiter);
+
 app.use(bodyParser.json({
   limit: '1mb',
 }));       // to support JSON-encoded bodies
-app.use(bodyParser.urlencoded({     
+app.use(bodyParser.urlencoded({
   extended: true,
   limit: '1mb',
 })); // to support URL-encoded bodies
 app.use(cookieParser());
 
 var sessSet = {
-    cookie: { maxAge: 7 * 24 * 60 * 60 * 1000 }, // 1 week
+    cookie: {
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 1 week
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production' && !process.env.DISABLE_SECURE_COOKIE,
+        sameSite: 'lax'
+    },
     store: new SQLiteStore,
-    saveUninitialized: true,
-    resave: 'true',
-    secret: secret
+    saveUninitialized: false,
+    resave: false,
+    secret: secret,
+    name: 'pagermon.sid'
 }
 
 if (process.env.HOSTNAME && process.env.USE_COOKIE_HOST)
@@ -182,6 +225,15 @@ app.use('/admin', admin);
 app.use('/post', api);
 app.use('/api', api);
 app.use('/auth', auth);
+
+// Health check endpoint for Docker/load balancers
+app.get('/health', function(req, res) {
+    res.status(200).json({
+        status: 'ok',
+        uptime: process.uptime(),
+        timestamp: Date.now()
+    });
+});
 
 
 // catch 404 and forward to error handler

@@ -10,6 +10,7 @@ var logger = require('../log');
 var db = require('../knex/knex.js');
 var converter = require('json-2-csv');
 var livelog = require('../lib/livelog');
+var { body, validationResult } = require('express-validator');
 
 var nconf = require('nconf');
 
@@ -294,9 +295,18 @@ router.route('/messages')
         }
       });
   })
-  .post(authHelper.isAdmin, function (req, res, next) {
-    nconf.load();
-    if (req.body.address && req.body.message) {
+  .post(authHelper.isAdmin,
+    body('address').trim().isLength({ min: 1, max: 50 }).escape(),
+    body('message').trim().isLength({ min: 1, max: 2000 }),
+    body('datetime').optional().isInt(),
+    body('source').optional().trim().isLength({ max: 100 }).escape(),
+    function (req, res, next) {
+      const errors = validationResult(req);
+      if (!errors.isEmpty()) {
+        return res.status(400).json({ errors: errors.array() });
+      }
+      nconf.load();
+      if (req.body.address && req.body.message) {
       var dbtype = nconf.get('database:type');
       var filterDupes = nconf.get('messages:duplicateFiltering');
       var dupeLimit = nconf.get('messages:duplicateLimit') || 0; // default 0
