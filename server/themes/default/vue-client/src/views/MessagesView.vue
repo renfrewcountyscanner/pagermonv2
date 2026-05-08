@@ -5,7 +5,7 @@
     <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
       <div class="input-group input-group-sm" style="max-width:320px;">
         <span class="input-group-text"><i class="bi bi-search"></i></span>
-        <input v-model="searchQuery" @input="onSearchInput" type="text" class="form-control" placeholder="Search messages…" />
+        <input v-model="searchQuery" @input="onSearchInput" ref="searchInput" type="text" class="form-control" placeholder="Search messages… (press /)" />
         <button v-if="searchQuery" class="btn btn-outline-secondary" @click="clearSearch"><i class="bi bi-x-lg"></i></button>
       </div>
 
@@ -17,40 +17,54 @@
         <i class="bi bi-arrow-clockwise" :class="{ 'spin': loading }"></i>
       </button>
 
-      <!-- Hide duplicates toggle -->
-      <button
-        class="btn btn-sm"
-        :class="hideDuplicates ? 'btn-warning' : 'btn-outline-secondary'"
-        @click="toggleHideDuplicates"
-        :title="hideDuplicates ? 'Click to show all messages including duplicates' : 'Click to hide duplicate dispatch pages (same message text, different capcodes)'"
-      >
-        <i class="bi bi-funnel-fill me-1"></i>
-        {{ hideDuplicates ? 'Hide dupes ON' : 'Hide dupes OFF' }}
+      <!-- Date range -->
+      <span class="d-flex align-items-center gap-1 small text-muted">
+        <input v-model="dateFrom" @change="loadMessages(true)" type="date" class="form-control form-control-sm" style="width:140px;" title="From date" />
+        <span>–</span>
+        <input v-model="dateTo" @change="loadMessages(true)" type="date" class="form-control form-control-sm" style="width:140px;" title="To date" />
+      </span>
+
+      <!-- Collapsible toggles for mobile -->
+      <button class="btn btn-sm btn-outline-secondary d-lg-none" @click="showToggles = !showToggles" :title="showToggles ? 'Hide filters' : 'Show filters'">
+        <i class="bi bi-sliders"></i>
       </button>
 
-      <!-- Audio alert toggle -->
-      <button
-        class="btn btn-sm"
-        :class="audioEnabled ? 'btn-success' : 'btn-outline-secondary'"
-        @click="toggleAudio"
-        title="Toggle audio alert for new calls"
-      >
-        <i :class="audioEnabled ? 'bi bi-volume-up-fill' : 'bi bi-volume-mute-fill'"></i>
-      </button>
+      <div class="d-flex flex-wrap gap-2" :class="{ 'd-none': !showToggles && isMobile }">
+        <!-- Hide duplicates toggle -->
+        <button
+          class="btn btn-sm"
+          :class="hideDuplicates ? 'btn-primary' : 'btn-outline-secondary'"
+          @click="toggleHideDuplicates"
+          title="Hide duplicate dispatch pages (same message text, different capcodes)"
+        >
+          <i class="bi bi-funnel-fill me-1"></i>
+          {{ hideDuplicates ? 'Hide dupes' : 'Dupes' }}
+        </button>
 
-      <button class="btn btn-sm" :class="notifEnabled ? 'btn-warning' : 'btn-outline-secondary'"
-        @click="toggleNotifications" v-if="notifSupported" title="Browser notifications">
-        <i class="bi bi-bell-fill"></i>
-      </button>
+        <!-- Audio alert toggle -->
+        <button
+          class="btn btn-sm"
+          :class="audioEnabled ? 'btn-success' : 'btn-outline-secondary'"
+          @click="toggleAudio"
+          title="Toggle audio alert for new calls"
+        >
+          <i :class="audioEnabled ? 'bi bi-volume-up-fill' : 'bi bi-volume-mute-fill'"></i>
+        </button>
+
+        <button class="btn btn-sm" :class="notifEnabled ? 'btn-primary' : 'btn-outline-secondary'"
+          @click="toggleNotifications" v-if="notifSupported" title="Browser notifications">
+          <i class="bi bi-bell-fill"></i>
+        </button>
+      </div>
 
       <span class="ms-auto d-flex align-items-center small" :title="connected ? 'Live' : 'Disconnected'">
         <span class="live-dot" :class="connected ? 'connected' : 'disconnected'"></span>
-        <span class="text-muted">{{ connected ? 'Live' : 'Offline' }}</span>
+        <span class="text-muted d-none d-sm-inline">{{ connected ? 'Live' : 'Offline' }}</span>
       </span>
 
       <span v-if="activeFilter" class="badge bg-primary d-flex align-items-center gap-1">
         {{ activeFilter }}
-        <a href="/" class="text-white text-decoration-none ms-1"><i class="bi bi-x-lg"></i></a>
+        <button class="btn-close btn-close-white small ms-1" @click="clearActiveFilter"></button>
       </span>
     </div>
 
@@ -59,20 +73,44 @@
       <table class="table table-hover table-sm msg-table align-middle mb-0">
         <thead>
           <tr>
-            <th class="ts-col">Date/Time</th>
-            <th class="src-col hide-mobile">Src</th>
-            <th class="cap-col hide-mobile">Capcode</th>
-            <th class="agency-col hide-mobile">Agency</th>
-            <th class="alias-col hide-mobile">Alias</th>
-            <th>Message</th>
+            <th class="ts-col sortable" @click="setSort('timestamp')">
+              Date/Time
+              <i :class="sortIcon('timestamp')"></i>
+            </th>
+            <th class="src-col hide-mobile sortable" @click="setSort('source')">
+              Src
+              <i :class="sortIcon('source')"></i>
+            </th>
+            <th class="cap-col hide-mobile sortable" @click="setSort('address')">
+              Capcode
+              <i :class="sortIcon('address')"></i>
+            </th>
+            <th class="agency-col hide-mobile sortable" @click="setSort('agency')">
+              Agency
+              <i :class="sortIcon('agency')"></i>
+            </th>
+            <th class="alias-col hide-mobile sortable" @click="setSort('alias')">
+              Alias
+              <i :class="sortIcon('alias')"></i>
+            </th>
+            <th class="sortable" @click="setSort('message')">
+              Message
+              <i :class="sortIcon('message')"></i>
+            </th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="loading && messages.length === 0">
-            <td colspan="6" class="text-center py-4 text-muted"><i class="bi bi-arrow-clockwise spin me-2"></i>Loading…</td>
+            <td colspan="6" class="text-center py-5 text-muted">
+              <i class="bi bi-arrow-clockwise spin me-2"></i>Loading…
+            </td>
           </tr>
-          <tr v-else-if="!loading && visibleMessages.length === 0">
-            <td colspan="6" class="text-center py-4 text-muted">No messages found.</td>
+          <tr v-else-if="!loading && messages.length === 0">
+            <td colspan="6" class="text-center py-5 text-muted">
+              <div class="mb-2"><i class="bi bi-inbox" style="font-size:2rem;"></i></div>
+              No messages found.<br />
+              <span class="small">Pages will appear here when received.</span>
+            </td>
           </tr>
           <tr
             v-for="msg in visibleMessages"
@@ -104,19 +142,19 @@
     <div v-if="pageCount > 1" class="d-flex justify-content-center mt-3">
       <nav><ul class="pagination pagination-sm mb-0">
         <li class="page-item" :class="{ disabled: currentPage === 0 }">
-          <button class="page-link" @click="goPage(0)"><i class="bi bi-chevron-double-left"></i></button>
+          <button class="page-link" @click="goPage(0)" title="First page"><i class="bi bi-chevron-double-left"></i></button>
         </li>
         <li class="page-item" :class="{ disabled: currentPage === 0 }">
-          <button class="page-link" @click="goPage(currentPage - 1)"><i class="bi bi-chevron-left"></i></button>
+          <button class="page-link" @click="goPage(currentPage - 1)" title="Previous page"><i class="bi bi-chevron-left"></i></button>
         </li>
         <li v-for="p in visiblePages" :key="p" class="page-item" :class="{ active: p === currentPage }">
           <button class="page-link" @click="goPage(p)">{{ p + 1 }}</button>
         </li>
         <li class="page-item" :class="{ disabled: currentPage >= pageCount - 1 }">
-          <button class="page-link" @click="goPage(currentPage + 1)"><i class="bi bi-chevron-right"></i></button>
+          <button class="page-link" @click="goPage(currentPage + 1)" title="Next page"><i class="bi bi-chevron-right"></i></button>
         </li>
         <li class="page-item" :class="{ disabled: currentPage >= pageCount - 1 }">
-          <button class="page-link" @click="goPage(pageCount - 1)"><i class="bi bi-chevron-double-right"></i></button>
+          <button class="page-link" @click="goPage(pageCount - 1)" title="Last page"><i class="bi bi-chevron-double-right"></i></button>
         </li>
       </ul></nav>
     </div>
@@ -151,10 +189,18 @@
           <dt v-if="selected.alias" class="col-4 text-muted">Alias</dt>
           <dd v-if="selected.alias" class="col-8">{{ selected.alias }}</dd>
         </dl>
-        <div class="p-2 rounded" style="background:var(--pm-surface-alt); word-break:break-word;">
+        <div class="p-2 rounded mb-2" style="background:var(--pm-surface-alt); word-break:break-word; white-space:pre-wrap;">
           {{ selected.message }}
         </div>
-        <div class="mt-3 d-flex gap-2">
+        <div class="d-flex flex-wrap gap-2 mb-3">
+          <button class="btn btn-sm btn-outline-secondary" @click="copyMessage(selected)" title="Copy message to clipboard">
+            <i class="bi bi-clipboard me-1"></i>Copy
+          </button>
+          <button class="btn btn-sm btn-outline-secondary" @click="copyCapcode(selected)" title="Copy capcode to clipboard">
+            <i class="bi bi-hash me-1"></i>Copy Capcode
+          </button>
+        </div>
+        <div class="d-flex gap-2">
           <button class="btn btn-sm btn-outline-primary" @click="filterByAlias(selected)">
             <i class="bi bi-funnel-fill me-1"></i>Filter alias
           </button>
@@ -168,7 +214,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, inject } from 'vue'
+import { ref, computed, onMounted, onUnmounted, inject } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSocket } from '../composables/useSocket.js'
 
@@ -176,17 +222,18 @@ const route = useRoute()
 const router = useRouter()
 const addToast = inject('toast', () => {})
 
-const messages   = ref([])
-const loading    = ref(false)
+const messages    = ref([])
+const loading     = ref(false)
 const currentPage = ref(0)
-const pageCount  = ref(0)
-const msgCount   = ref(0)
-const limit      = ref(parseInt(localStorage.getItem('pm-limit') || '50'))
+const pageCount   = ref(0)
+const msgCount    = ref(0)
+const limit       = ref(parseInt(localStorage.getItem('pm-limit') || '50'))
 const searchQuery = ref('')
 const activeFilter = ref('')
-const selected   = ref(null)
-const newIds     = ref(new Set())   // blue flash — all new messages
-const alertIds   = ref(new Set())   // red blink — new unique calls only
+const selected     = ref(null)
+const newIds      = ref(new Set())
+const alertIds    = ref(new Set())
+const showToggles = ref(false)
 
 const hideDuplicates = ref(localStorage.getItem('pm-hidedupes') === 'true')
 const audioEnabled   = ref(localStorage.getItem('pm-audio') !== 'false')
@@ -195,14 +242,34 @@ const notifSupported = ref('Notification' in window)
 
 const { connected, connect } = useSocket()
 
-// Tracks recently seen message texts for dedup detection (text → timestamp ms)
 const recentTexts = new Map()
 const DEDUP_WINDOW_MS = 15 * 60 * 1000
 
 let searchTimer = null
 let audioCtx = null
 
-// ── Dedup helpers ──────────────────────────────────────────────────────────
+const isMobile = ref(false)
+const searchInput = ref(null)
+
+const sortField = ref('timestamp')
+const sortDir = ref('desc')
+const dateFrom = ref('')
+const dateTo = ref('')
+
+function sortIcon(field) {
+  if (sortField.value !== field) return 'bi bi-filter'
+  return sortDir.value === 'asc' ? 'bi bi-sort-up' : 'bi bi-sort-down'
+}
+
+function setSort(field) {
+  if (sortField.value === field) {
+    sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    sortField.value = field
+    sortDir.value = 'asc'
+  }
+  loadMessages(true)
+}
 
 function msgKey(text) {
   return (text || '').trim().replace(/\s+/g, ' ').toLowerCase()
@@ -223,16 +290,12 @@ function isNewUniqueCall(text) {
   return true
 }
 
-// Seed the dedup map from the initial message load so we don't false-alert
-// on messages that are already on screen when the page first loads
 function seedRecentTexts(msgs) {
   for (const m of msgs) {
     const ts = (m.timestamp || 0) * 1000
     recentTexts.set(msgKey(m.message), ts)
   }
 }
-
-// ── Audio ──────────────────────────────────────────────────────────────────
 
 function getAudioCtx() {
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)()
@@ -243,7 +306,6 @@ function playChime() {
   if (!audioEnabled.value) return
   try {
     const ctx = getAudioCtx()
-    // Two-note ascending chime: G5 then B5 — gentle, clear
     const notes = [{ freq: 784, start: 0 }, { freq: 988, start: 0.18 }]
     notes.forEach(({ freq, start }) => {
       const osc  = ctx.createOscillator()
@@ -262,8 +324,6 @@ function playChime() {
   } catch (_) {}
 }
 
-// ── Visibility filter ──────────────────────────────────────────────────────
-
 const visibleMessages = computed(() => {
   if (!hideDuplicates.value) return messages.value
   const seen = new Set()
@@ -275,10 +335,6 @@ const visibleMessages = computed(() => {
   })
 })
 
-const hiddenCount = computed(() => messages.value.length - visibleMessages.value.length)
-
-// ── Toolbar actions ────────────────────────────────────────────────────────
-
 function toggleHideDuplicates() {
   hideDuplicates.value = !hideDuplicates.value
   localStorage.setItem('pm-hidedupes', hideDuplicates.value)
@@ -287,11 +343,8 @@ function toggleHideDuplicates() {
 function toggleAudio() {
   audioEnabled.value = !audioEnabled.value
   localStorage.setItem('pm-audio', audioEnabled.value)
-  // Play sample note so user hears what the alert sounds like when enabling
   if (audioEnabled.value) playChime()
 }
-
-// ── Pagination ─────────────────────────────────────────────────────────────
 
 const visiblePages = computed(() => {
   const total = pageCount.value
@@ -303,11 +356,17 @@ const visiblePages = computed(() => {
   return pages
 })
 
-// ── Formatting ─────────────────────────────────────────────────────────────
-
 function formatTime(ts) {
   if (!ts) return ''
-  return new Date(ts * 1000).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  const d = new Date(ts * 1000)
+  const pad = n => String(n).padStart(2, '0')
+  const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getUTCMonth()]
+  const dy = d.getUTCDate()
+  const mi = pad(d.getUTCMinutes())
+  const se = pad(d.getUTCSeconds())
+  const ampm = d.getUTCHours() >= 12 ? 'p.m.' : 'a.m.'
+  const h12 = d.getUTCHours() % 12 || 12
+  return `${mo} ${dy}, ${h12}:${mi}:${se} ${ampm}`
 }
 
 function formatFull(ts) {
@@ -330,8 +389,6 @@ function highlight(text) {
   return escaped.replace(new RegExp(q, 'gi'), m => `<mark>${m}</mark>`)
 }
 
-// ── Data loading ───────────────────────────────────────────────────────────
-
 async function loadMessages(resetPage = false) {
   if (resetPage) currentPage.value = 0
   loading.value = true
@@ -344,7 +401,15 @@ async function loadMessages(resetPage = false) {
     const address = route.query.address || ''
 
     let url = '/api/messages'
-    const params = new URLSearchParams({ page: currentPage.value + 1, limit: limit.value })
+    const params = new URLSearchParams({
+      page: currentPage.value + 1,
+      limit: limit.value,
+      sort: sortField.value,
+      dir: sortDir.value
+    })
+
+    if (dateFrom.value) params.append('from', dateFrom.value)
+    if (dateTo.value)   params.append('to',   dateTo.value)
 
     if (q || agency || alias || address) {
       url = '/api/messageSearch'
@@ -383,12 +448,16 @@ function clearSearch() {
   loadMessages(true)
 }
 
+function clearActiveFilter() {
+  activeFilter.value = ''
+  router.replace('/')
+  loadMessages(true)
+}
+
 function goPage(p) {
   currentPage.value = Math.max(0, Math.min(p, pageCount.value - 1))
   loadMessages()
 }
-
-// ── Detail panel ───────────────────────────────────────────────────────────
 
 function selectMessage(msg) { selected.value = msg }
 
@@ -410,8 +479,6 @@ function filterByAgency(msg) {
   loadMessages(true)
 }
 
-// ── Notifications ──────────────────────────────────────────────────────────
-
 function toggleNotifications() {
   if (Notification.permission === 'granted') {
     notifEnabled.value = false
@@ -419,15 +486,26 @@ function toggleNotifications() {
   } else {
     Notification.requestPermission().then(p => {
       notifEnabled.value = p === 'granted'
-      addToast(
-        p === 'granted' ? 'Notifications enabled' : 'Permission denied',
-        p === 'granted' ? 'success' : 'warning'
-      )
+      addToast(p === 'granted' ? 'Notifications enabled' : 'Permission denied', p === 'granted' ? 'success' : 'warning')
     })
   }
 }
 
-// ── Socket handler ─────────────────────────────────────────────────────────
+function copyMessage(msg) {
+  navigator.clipboard.writeText(msg.message).then(() => {
+    addToast('Message copied!', 'success')
+  }).catch(() => {
+    addToast('Copy failed', 'danger')
+  })
+}
+
+function copyCapcode(msg) {
+  navigator.clipboard.writeText(msg.address).then(() => {
+    addToast('Capcode copied!', 'success')
+  }).catch(() => {
+    addToast('Copy failed', 'danger')
+  })
+}
 
 function handleSocketMessage(msg) {
   const isUnique = isNewUniqueCall(msg.message)
@@ -458,15 +536,43 @@ function handleSocketMessage(msg) {
   }
 }
 
-// ── Init ───────────────────────────────────────────────────────────────────
+function handleKeydown(e) {
+  if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+    e.preventDefault()
+    searchInput.value?.focus()
+  }
+  if (e.key === 'Escape') {
+    if (selected.value) selected.value = null
+    else searchInput.value?.blur()
+  }
+  if (e.key === 'n' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+    if (currentPage.value < pageCount.value - 1) goPage(currentPage.value + 1)
+  }
+  if (e.key === 'p' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
+    if (currentPage.value > 0) goPage(currentPage.value - 1)
+  }
+}
+
+function checkMobile() {
+  isMobile.value = window.innerWidth < 992
+}
 
 onMounted(() => {
   if (route.query.q)      searchQuery.value  = route.query.q
   if (route.query.agency) activeFilter.value = route.query.agency
   if (route.query.alias)  activeFilter.value = route.query.alias
 
+  checkMobile()
+  window.addEventListener('resize', checkMobile)
+  window.addEventListener('keydown', handleKeydown)
+
   loadMessages()
   connect(handleSocketMessage)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', checkMobile)
+  window.removeEventListener('keydown', handleKeydown)
 })
 </script>
 
@@ -474,7 +580,6 @@ onMounted(() => {
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* Red blink for new unique calls — target td because Bootstrap sets bg on td, not tr */
 .alert-blink td {
   animation: redBlink 1s ease-in-out 10;
 }
@@ -482,4 +587,14 @@ onMounted(() => {
   0%, 100% { background-color: transparent; }
   50%       { background-color: rgba(220, 53, 69, 0.45); }
 }
+
+.sortable {
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+}
+.sortable:hover { color: var(--pm-accent); }
+.sortable i { font-size: 0.75rem; margin-left: 2px; opacity: 0.6; }
+
+.btn-close { font-size: 0.5rem; padding: 0.25rem; }
 </style>

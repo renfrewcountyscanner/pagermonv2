@@ -196,6 +196,12 @@ router.route('/messages')
     } else {
       initData.limit = parseInt(defaultLimit, 10);
     }
+
+    var sortField = req.query.sort || 'timestamp';
+    var sortDir = req.query.dir === 'asc' ? 'asc' : 'desc';
+    var dateFrom = req.query.from ? new Date(req.query.from) : null;
+    var dateTo = req.query.to ? new Date(req.query.to + 'T23:59:59Z') : null;
+
     if (pdwMode) {
       if (adminShow && req.isAuthenticated() && req.user.role == 'admin') {
         var subquery = db.from('capcodes').where('ignore', '=', 1).select('id')
@@ -215,6 +221,8 @@ router.route('/messages')
       } else {
         this.from('messages').where('alias_id', 'not in', subquery).orWhereNull('alias_id')
       }
+      if (dateFrom) this.where('timestamp', '>=', Math.floor(dateFrom.getTime() / 1000))
+      if (dateTo)   this.where('timestamp', '<=', Math.floor(dateTo.getTime() / 1000))
     }).count('* as msgcount')
       .then(function (initcount) {
         var count = initcount[0]
@@ -235,6 +243,16 @@ router.route('/messages')
           var result = [];
           var rowCount
 
+          var sortColumnMap = {
+            timestamp: 'messages.timestamp',
+            source: 'messages.source',
+            address: 'messages.address',
+            agency: 'capcodes.agency',
+            alias: 'capcodes.alias',
+            message: 'messages.message'
+          }
+          var sortCol = sortColumnMap[sortField] || 'messages.timestamp'
+
           db.from('messages')
             .select('messages.*', 'capcodes.alias', 'capcodes.agency', 'capcodes.icon', 'capcodes.color', 'capcodes.ignore', db.raw('CASE WHEN NOT capcodes.address = messages.address THEN 1 ELSE 0 END as wildcard'))
             .modify(function (queryBuilder) {
@@ -247,8 +265,10 @@ router.route('/messages')
               } else {
                 queryBuilder.leftJoin('capcodes', 'capcodes.id', '=', 'messages.alias_id').where('capcodes.ignore', 0).orWhereNull('capcodes.ignore')
               }
+              if (dateFrom) queryBuilder.where('messages.timestamp', '>=', Math.floor(dateFrom.getTime() / 1000))
+              if (dateTo)   queryBuilder.where('messages.timestamp', '<=', Math.floor(dateTo.getTime() / 1000))
             })
-            .orderBy('messages.timestamp', 'desc')
+            .orderBy(sortCol, sortDir)
             .limit(initData.limit)
             .offset(initData.offset)
             .then(rows => {

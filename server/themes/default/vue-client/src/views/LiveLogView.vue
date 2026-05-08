@@ -10,9 +10,13 @@
 
       <div class="input-group input-group-sm" style="max-width:280px;">
         <span class="input-group-text"><i class="bi bi-funnel"></i></span>
-        <input v-model="filterText" type="text" class="form-control" placeholder="Filter (substring)…" />
+        <input v-model="filterText" type="text" class="form-control" placeholder="Filter text…" />
         <button v-if="filterText" class="btn btn-outline-secondary" @click="filterText = ''"><i class="bi bi-x-lg"></i></button>
       </div>
+
+      <button class="btn btn-sm" :class="filterRegex ? 'btn-primary' : 'btn-outline-secondary'" @click="filterRegex = !filterRegex" title="Toggle regex mode">
+        <i class="bi bi-braces"></i> Regex
+      </button>
 
       <button class="btn btn-sm" :class="paused ? 'btn-warning' : 'btn-outline-secondary'" @click="togglePause">
         <i :class="paused ? 'bi bi-play-fill' : 'bi bi-pause-fill'"></i>
@@ -39,6 +43,7 @@
 
     <div ref="consoleEl" class="livelog-console" @scroll="onScroll">
       <div v-if="entries.length === 0" class="text-muted small p-3 text-center">
+        <i class="bi bi-terminal" style="font-size:1.5rem;"></i><br />
         Waiting for incoming pages…
       </div>
       <div
@@ -60,11 +65,12 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 
-const entries = ref([])         // accepted entries currently in view
-const buffer = ref([])          // entries received while paused
+const entries = ref([])
+const buffer = ref([])
 const paused = ref(false)
 const autoscroll = ref(true)
 const filterText = ref('')
+const filterRegex = ref(false)
 const connected = ref(false)
 const consoleEl = ref(null)
 const maxBuffer = 1000
@@ -74,14 +80,26 @@ let nextLocalId = 1
 
 const bufferedCount = computed(() => buffer.value.length)
 const visibleEntries = computed(() => {
-  const q = filterText.value.trim().toLowerCase()
+  const q = filterText.value.trim()
   if (!q) return entries.value
+  if (filterRegex.value) {
+    let re
+    try { re = new RegExp(q, 'i') } catch { return entries.value }
+    return entries.value.filter(e =>
+      re.test(e.message || '') ||
+      re.test(e.alias || '') ||
+      re.test(e.agency || '') ||
+      re.test(e.address || '') ||
+      re.test(e.source || '')
+    )
+  }
+  const lower = q.toLowerCase()
   return entries.value.filter(e =>
-    (e.message || '').toLowerCase().includes(q) ||
-    (e.alias || '').toLowerCase().includes(q) ||
-    (e.agency || '').toLowerCase().includes(q) ||
-    (e.address || '').toLowerCase().includes(q) ||
-    (e.source || '').toLowerCase().includes(q)
+    (e.message || '').toLowerCase().includes(lower) ||
+    (e.alias || '').toLowerCase().includes(lower) ||
+    (e.agency || '').toLowerCase().includes(lower) ||
+    (e.address || '').toLowerCase().includes(lower) ||
+    (e.source || '').toLowerCase().includes(lower)
   )
 })
 const visibleCount = computed(() => visibleEntries.value.length)
