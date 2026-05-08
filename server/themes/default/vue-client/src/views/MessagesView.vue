@@ -360,12 +360,13 @@ function formatTime(ts) {
   if (!ts) return ''
   const d = new Date(ts * 1000)
   const pad = n => String(n).padStart(2, '0')
-  const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getUTCMonth()]
-  const dy = d.getUTCDate()
-  const mi = pad(d.getUTCMinutes())
-  const se = pad(d.getUTCSeconds())
-  const ampm = d.getUTCHours() >= 12 ? 'p.m.' : 'a.m.'
-  const h12 = d.getUTCHours() % 12 || 12
+  const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]
+  const dy = d.getDate()
+  const mi = pad(d.getMinutes())
+  const se = pad(d.getSeconds())
+  const h = d.getHours()
+  const ampm = h >= 12 ? 'p.m.' : 'a.m.'
+  const h12 = h % 12 || 12
   return `${mo} ${dy}, ${h12}:${mi}:${se} ${ampm}`
 }
 
