@@ -59,7 +59,7 @@
       <table class="table table-hover table-sm msg-table align-middle mb-0">
         <thead>
           <tr>
-            <th class="ts-col">Time</th>
+            <th class="ts-col">Date/Time</th>
             <th class="src-col hide-mobile">Src</th>
             <th class="cap-col hide-mobile">Capcode</th>
             <th class="agency-col hide-mobile">Agency</th>
@@ -226,10 +226,9 @@ function isNewUniqueCall(text) {
 // Seed the dedup map from the initial message load so we don't false-alert
 // on messages that are already on screen when the page first loads
 function seedRecentTexts(msgs) {
-  const cutoff = Date.now() - DEDUP_WINDOW_MS
   for (const m of msgs) {
     const ts = (m.timestamp || 0) * 1000
-    if (ts > cutoff) recentTexts.set(msgKey(m.message), ts)
+    recentTexts.set(msgKey(m.message), ts)
   }
 }
 
@@ -308,7 +307,7 @@ const visiblePages = computed(() => {
 
 function formatTime(ts) {
   if (!ts) return ''
-  return new Date(ts * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  return new Date(ts * 1000).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })
 }
 
 function formatFull(ts) {
@@ -358,12 +357,15 @@ async function loadMessages(resetPage = false) {
     const r = await fetch(`${url}?${params}`)
     if (!r.ok) { loading.value = false; return }
     const d = await r.json()
-    messages.value = d.messages || []
+    const newMsgs = d.messages || []
     const init = d.init || {}
     pageCount.value = init.pageCount || 0
     msgCount.value  = init.msgCount  || 0
 
-    seedRecentTexts(messages.value)
+    const existingIds = new Set(messages.value.map(m => m.id))
+    const merged = [...newMsgs, ...messages.value.filter(m => !existingIds.has(m.id))]
+    messages.value = merged.slice(0, limit.value)
+    seedRecentTexts(merged)
   } catch (e) {
     console.error(e)
   }
@@ -430,30 +432,29 @@ function toggleNotifications() {
 function handleSocketMessage(msg) {
   const isUnique = isNewUniqueCall(msg.message)
 
-  if (currentPage.value === 0) {
+  const existingIds = new Set(messages.value.map(m => m.id))
+  if (!existingIds.has(msg.id)) {
     messages.value.unshift(msg)
     if (messages.value.length > limit.value) messages.value.pop()
     msgCount.value++
+  }
 
-    if (isUnique) {
-      // Red blinking alert for new unique call
-      alertIds.value = new Set([...alertIds.value, msg.id])
-      setTimeout(() => {
-        alertIds.value = new Set([...alertIds.value].filter(id => id !== msg.id))
-      }, 10000)
+  if (isUnique) {
+    alertIds.value = new Set([...alertIds.value, msg.id])
+    setTimeout(() => {
+      alertIds.value = new Set([...alertIds.value].filter(id => id !== msg.id))
+    }, 10000)
 
-      playChime()
+    playChime()
 
-      if (notifEnabled.value && Notification.permission === 'granted') {
-        new Notification(msg.alias || msg.address, { body: msg.message, tag: String(msg.id) })
-      }
-    } else {
-      // Subtle blue flash for duplicate (same incident, different unit)
-      newIds.value = new Set([...newIds.value, msg.id])
-      setTimeout(() => {
-        newIds.value = new Set([...newIds.value].filter(id => id !== msg.id))
-      }, 1500)
+    if (notifEnabled.value && Notification.permission === 'granted') {
+      new Notification(msg.alias || msg.address, { body: msg.message, tag: String(msg.id) })
     }
+  } else {
+    newIds.value = new Set([...newIds.value, msg.id])
+    setTimeout(() => {
+      newIds.value = new Set([...newIds.value].filter(id => id !== msg.id))
+    }, 1500)
   }
 }
 
