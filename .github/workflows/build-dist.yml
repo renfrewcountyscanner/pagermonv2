@@ -9,6 +9,9 @@ on:
       - master
       - develop
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build-dist:
     runs-on: ubuntu-latest
@@ -20,8 +23,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: server/themes/default/vue-client/package-lock.json
 
       - name: Install dependencies
         working-directory: server/themes/default/vue-client
