@@ -1,13 +1,17 @@
 # PagerMon
 
-PagerMon is an API driven client/server framework for parsing and displaying pager messages from multimon-ng. It is built around POCSAG messages, but easily supports other message types as required.
+PagerMon is an API-driven client/server framework for parsing and displaying pager messages from [multimon-ng](https://github.com/EliasOenal/multimon-ng). It is built around POCSAG messages, but easily supports FLEX and EAS message types.
 
 The UI is built on a Node/Express/Vue 3/Bootstrap stack, while the client scripts receive piped input from multimon-ng.
+
+**Live demo:** [https://pagermonv2.firepage.ca](https://pagermonv2.firepage.ca)
+
+---
 
 ## Features
 
 - Capcode aliasing with colors and [FontAwesome](https://fontawesome.io/icons/) icons
-- API driven extensible architecture
+- API-driven extensible architecture
 - Multi-user support with role-based access
 - SQLite or MySQL database backing
 - Configurable via web UI
@@ -30,111 +34,74 @@ The UI is built on a Node/Express/Vue 3/Bootstrap stack, while the client script
   - Message Repeat
   - Simple & Generic Webhooks
 
+---
+
 ## Screenshots
 
-The UI has been rebuilt with Vue 3 and Bootstrap 5. See the live demo or your local install for current screenshots.
+| Messages View | Live Log |
+|:---:|:---:|
+| ![Messages](screenshots/messages.png) | ![Live Log](screenshots/livelog.png) |
 
-> **Note:** Replace the placeholder links below with screenshots from your own instance.
->
-> - Main Messages View: `/`
-> - Live Log View: `/livelog`
-> - Admin Settings: `/admin`
->
-> Live instance: [https://pagermonv2.firepage.ca](https://pagermonv2.firepage.ca)
+| Admin Settings | Aliases |
+|:---:|:---:|
+| ![Admin Settings](screenshots/admin-settings.png) | ![Aliases](screenshots/aliases.png) |
 
 ---
 
-## Getting Started
+## Quick Start (One-Line Install)
 
-### Prerequisites
+```bash
+curl -fsSL https://raw.githubusercontent.com/renfrewcountyscanner/pagermonv2/main/install.sh | sudo bash
+```
 
-- [Node.js](https://nodejs.org/) 18.x or higher (LTS recommended)
-- npm (comes with Node.js)
-- sqlite3 (if using SQLite; usually pre-installed on most Linux distributions)
+This interactive installer will ask whether you want:
+- **Server**, **Client**, or **Both**
+- **Barebones** (direct install) or **Docker**
 
-#### Recommended
-
-- [nvm](https://github.com/nvm-sh/nvm) for Node version management
-- nginx or another reverse proxy for SSL offloading
+Then it will handle everything automatically: dependency installation, Node.js setup, Vue build, config generation, and service creation.
 
 ---
 
-## Running the Server
+## Prerequisites
 
-### Local Setup
+- Linux (Debian, Ubuntu, CentOS, Rocky, Alpine)
+- [Node.js](https://nodejs.org/) 18.x or higher (installed automatically by the script if missing)
+- For barebones client: RTL-SDR dongle + `rtl-sdr` and `multimon-ng` tools
+- For Docker: Docker Engine + Docker Compose
 
-1. **Clone the repository**
+---
+
+## Manual Installation
+
+### Server
 
 ```bash
 git clone https://github.com/renfrewcountyscanner/pagermonv2.git
-cd pagermonv2
-```
-
-2. **Install server dependencies**
-
-```bash
-cd server
+cd pagermonv2/server
 npm install
-cd ..
-```
-
-3. **Build the Vue frontend**
-
-```bash
-cd server/themes/default/vue-client
+cd themes/default/vue-client
 npm install
 npm run build
-cd ../../../../../
-```
-
-4. **Configure the application**
-
-Copy the default configuration and edit it:
-
-```bash
+cd ../../../..
 cp server/config/default.json server/config/config.json
-```
-
-**Important:** Edit `server/config/config.json` and change at minimum:
-
-- `global.sessionSecret` — set to a long random string (e.g., 32+ alphanumeric characters)
-- `auth.keys` — replace the example API key with your own secure keys for client authentication
-- `auth.encPass` — this is the bcrypt hash for the default password `changeme`. You can log in with `admin` / `changeme` and change the password via the web UI.
-
-5. **Initialize the database**
-
-On first run, the app will automatically create the SQLite database and run migrations. If you prefer MySQL, update the `database` section in `config.json` before starting.
-
-6. **Start the server**
-
-```bash
-cd server
-npm start
+# Edit server/config/config.json — change sessionSecret and set an API key
+node server/app.js
 ```
 
 The server will be available at `http://localhost:3000`.
 
-7. **Log in and finish setup**
+Default login:
+- **Username:** `admin`
+- **Password:** `changeme` (change this immediately in Admin > Settings)
 
-- Open `http://localhost:3000`
-- Log in with username `admin` and password `changeme`
-- Go to **Admin > Settings** to change your password, configure API keys, and enable plugins
-
-### Production Deployment with PM2
+### Client
 
 ```bash
-npm install pm2 -g
-cd server
-export NODE_ENV=production
-pm2 start process.json
-pm2 startup
-pm2 save
-```
-
-For log rotation:
-
-```bash
-pm2 install pm2-logrotate
+cd pagermonv2/client
+npm install
+cp config/default.json config/config.json
+# Edit config/config.json — set apikey, hostname, and identifier
+./reader.sh
 ```
 
 ---
@@ -143,90 +110,28 @@ pm2 install pm2-logrotate
 
 ### Docker Compose (Recommended)
 
-A `docker-compose.yml` is included in the project root.
-
-```yaml
-version: '3.3'
-services:
-  pagermon:
-    build: ./server
-    image: pagermon
-    container_name: pagermon
-    ports:
-      - 3000:3000
-    volumes:
-      - ./data:/config
-    environment:
-      - TZ=Europe/London
-      - NODE_ENV=production
-      - HOSTNAME=localhost
-      - USE_COOKIE_HOST=false
-      - APP_NAME=pagermon
-```
-
-**Build and run:**
+A `docker-compose.yml` is included in the project root. It supports both the server and an optional client container.
 
 ```bash
-docker-compose up --build -d
+git clone https://github.com/renfrewcountyscanner/pagermonv2.git
+cd pagermonv2
+cp .env.example .env
+# Edit .env to set your timezone, port, and RTL-SDR settings
+docker compose up -d --build
 ```
+
+**To also start the RTL-SDR client:**
+
+```bash
+docker compose --profile client up -d --build
+```
+
+> The client container requires `--privileged` and `/dev/bus/usb` device mapping for RTL-SDR access.
 
 **Notes:**
-
-- Configuration and database are stored in `/config` inside the container.
-- Mount a host directory or named volume to `/config` to persist data across restarts.
-- The Vue frontend must be built **before** creating the Docker image (step 3 in Local Setup).
-
----
-
-## Running the Client
-
-The PagerMon client receives decoded pager data from [multimon-ng](https://github.com/EliasOenal/multimon-ng) and forwards it to the server.
-
-### Prerequisites
-
-- RTL-SDR tools and dongle (RTL2832U chip)
-- multimon-ng
-- Node.js and npm (if running the client separately from the server)
-
-### Installation
-
-```bash
-cd client
-npm install
-```
-
-### Configuration
-
-```bash
-cp config/default.json config/config.json
-```
-
-Edit `config/config.json`:
-
-```json
-{
-  "apikey": "YOUR_API_KEY_FROM_SERVER",
-  "hostname": "http://127.0.0.1:3000",
-  "identifier": "MyScanner",
-  "sendFunctionCode": false,
-  "useTimestamp": true,
-  "EAS": {
-    "excludeEvents": [],
-    "includeFIPS": [],
-    "addressAddType": true
-  }
-}
-```
-
-### Running
-
-Edit `reader.sh` to match your RTL-SDR device and frequency, then run:
-
-```bash
-rtl_fm -d 0 -E dc -F 0 -A fast -f 148.5875M -s22050 - | \
-multimon-ng -q -b1 -c -a POCSAG512 -f alpha -t raw /dev/stdin | \
-node reader.js
-```
+- Configuration and database are stored in a Docker named volume (`pagermon-data`).
+- The Vue frontend is built **inside** the server Docker image — no need to pre-build `dist/`.
+- Healthcheck endpoint: `GET /health`
 
 ---
 
@@ -234,23 +139,31 @@ node reader.js
 
 Plugins are enabled in **Admin > Settings** or by editing `server/config/config.json`.
 
+### Webhook Setup
+
+1. Enable the **Webhook** plugin in Settings.
+2. Configure the following fields:
+   - **Webhook URL:** Destination URL to POST messages to
+   - **Authorization Token:** Optional bearer token for the `Authorization` header
+   - **Webhook Mode:** `n8n` (full JSON payload) or `Generic` (custom headers + template)
+3. Save settings. Messages will be forwarded automatically.
+
 ### ntfy Setup
 
 1. Enable the **Ntfy** plugin in Settings.
-2. Configure the following fields:
-   - **Server URL:** `https://ntfy.sh` (public) or your self-hosted instance (e.g., `https://ntfy.yourdomain.com`)
-   - **Topic:** Your ntfy topic name (e.g., `pager-alerts`)
-   - **Title:** Notification title (supports `{alias}`, `{message}`, `{address}`, `{agency}`)
+2. Configure:
+   - **Server URL:** `https://ntfy.sh` (public) or your self-hosted instance
+   - **Topic:** Your ntfy topic name
+   - **Title:** Notification title
    - **Priority:** 1 (min) to 5 (max)
-   - **Tags:** Comma-separated tags (e.g., `pager,alert`)
-   - **Access Token:** Leave blank for public topics; required for protected topics on self-hosted servers
-3. Save settings. Messages matching the plugin filter mode will be pushed to your ntfy topic.
+   - **Tags:** Comma-separated tags
+   - **Access Token:** Required for protected topics on self-hosted servers
 
 ---
 
 ## Support
 
-Bugs and feature requests can be logged via the GitHub issues page.
+Bugs and feature requests can be logged via the [GitHub issues page](https://github.com/renfrewcountyscanner/pagermonv2/issues).
 
 ## Contributing
 

@@ -1,0 +1,44 @@
+name: Build and Commit Dist
+
+on:
+  push:
+    paths:
+      - 'server/themes/default/vue-client/**'
+    branches:
+      - main
+      - master
+      - develop
+
+jobs:
+  build-dist:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: server/themes/default/vue-client/package-lock.json
+
+      - name: Install dependencies
+        working-directory: server/themes/default/vue-client
+        run: npm ci
+
+      - name: Build dist
+        working-directory: server/themes/default/vue-client
+        run: npm run build
+
+      - name: Commit and push dist
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add server/themes/default/public/dist/
+          if git diff --cached --quiet; then
+            echo "No changes to dist"
+            exit 0
+          fi
+          git commit -m "chore: auto-build dist from vue-client"
+          git push

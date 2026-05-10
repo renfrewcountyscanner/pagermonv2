@@ -1,16 +1,50 @@
-version: '3.3'
+version: '3.8'
+
 services:
-    pagermon:
-        build: ./server
-        image: pagermon
-        container_name: pagermon
-        ports:
-            - 3000:3000
-        volumes:
-            - ./data:/config
-        environment:
-            - TZ=Europe/London
-            - NODE_ENV=production
-            - HOSTNAME=localhost
-            - USE_COOKIE_HOST=false
-            - APP_NAME=pagermon
+  pagermon-server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    image: pagermon-server:latest
+    container_name: pagermon-server
+    restart: unless-stopped
+    ports:
+      - "${SERVER_PORT:-3000}:3000"
+    volumes:
+      - pagermon-data:/config
+    environment:
+      - NODE_ENV=production
+      - TZ=${TZ:-UTC}
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  pagermon-client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    image: pagermon-client:latest
+    container_name: pagermon-client
+    restart: unless-stopped
+    privileged: true
+    devices:
+      - /dev/bus/usb:/dev/bus/usb
+    volumes:
+      - pagermon-client-config:/config
+    environment:
+      - NODE_ENV=production
+      - RTL_DEVICE=${RTL_DEVICE:-0}
+      - RTL_FREQ=${RTL_FREQ:-148.5875M}
+      - POCSAG_MODE=${POCSAG_MODE:-POCSAG512}
+    depends_on:
+      pagermon-server:
+        condition: service_healthy
+    profiles:
+      - client
+
+volumes:
+  pagermon-data:
+  pagermon-client-config:
