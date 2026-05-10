@@ -233,11 +233,26 @@ const config = ref(null)
 const plugins = ref([])
 const themes = ref([])
 
-const dedup = computed(() => {
-  if (!config.value) return {}
-  if (!config.value.messages) config.value.messages = {}
-  if (!config.value.messages.deduplication) config.value.messages.deduplication = { enable: false, windowMinutes: 15 }
-  return config.value.messages.deduplication
+const dedup = computed({
+  get() {
+    if (!config.value) return { enable: false, windowMinutes: 15 }
+    return config.value.messages?.deduplication || { enable: false, windowMinutes: 15 }
+  },
+  set(v) {
+    if (!config.value.messages) config.value.messages = {}
+    config.value.messages.deduplication = v
+  }
+})
+
+const apiKeys = computed({
+  get() {
+    if (!config.value) return []
+    return config.value.auth?.keys || []
+  },
+  set(v) {
+    if (!config.value.auth) config.value.auth = {}
+    config.value.auth.keys = v
+  }
 })
 
 function pluginConfig(name) {
@@ -245,13 +260,6 @@ function pluginConfig(name) {
   if (!config.value.plugins[name]) config.value.plugins[name] = { enable: false }
   return config.value.plugins[name]
 }
-
-const apiKeys = computed(() => {
-  if (!config.value) return []
-  if (!config.value.auth) config.value.auth = {}
-  if (!Array.isArray(config.value.auth.keys)) config.value.auth.keys = []
-  return config.value.auth.keys
-})
 
 function generateApiKey(index) {
   const u1 = (crypto.randomUUID?.() || fallbackUuid()).replace(/-/g, '')
@@ -288,6 +296,16 @@ onMounted(async () => {
       config.value = d.settings
       plugins.value = d.plugins || []
       themes.value = d.themes || []
+
+      // Initialize defaults to avoid state mutation during render
+      if (!config.value.messages) config.value.messages = {}
+      if (!config.value.messages.deduplication) config.value.messages.deduplication = { enable: false, windowMinutes: 15 }
+      if (!config.value.auth) config.value.auth = {}
+      if (!Array.isArray(config.value.auth.keys)) config.value.auth.keys = []
+      if (!config.value.plugins) config.value.plugins = {}
+      plugins.value.forEach(p => {
+        if (!config.value.plugins[p.name]) config.value.plugins[p.name] = { enable: false }
+      })
     }
   } catch (e) {
     error.value = 'Failed to load settings'

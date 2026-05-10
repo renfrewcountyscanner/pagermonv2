@@ -119,7 +119,7 @@ router.route('/login')
                                         });
                                 } else {
                                         res.status(401).send({ status: 'failed', error: 'User Disabled' });
-                                        logger.auth.debug(`User Disabled${req.user.username}`);
+                                        logger.auth.debug(`User Disabled: ${req.body.username}`);
                                 }
                         }
                 })(req, res, next);
@@ -205,6 +205,13 @@ router.route('/register')
                         const salt = bcrypt.genSaltSync();
                         const hash = bcrypt.hashSync(req.body.password, salt);
                         // dupecheck to prevent a non-literal insert being abused to reset passwords
+                        var responded = false;
+                        function safeRespond(status, json) {
+                                if (!responded) {
+                                        responded = true;
+                                        res.status(status).json(json);
+                                }
+                        }
                         return db('users')
                                 .where('username', '=', req.body.username)
                                 .orWhere('email', '=', req.body.email)
@@ -214,7 +221,7 @@ router.route('/register')
                                                 logger.auth.error(
                                                         `Duplicate registration via API${JSON.stringify(row)}`
                                                 );
-                                                res.status(401).json({ error: 'access denied' });
+                                                safeRespond(401, { error: 'access denied' });
                                         } else {
                                                 return db('users')
                                                         .insert({
@@ -231,28 +238,28 @@ router.route('/register')
                                                                 passport.authenticate('login-user', (err, user) => {
                                                                         if (user) {
                                                                                 req.logIn(user, function(err) {
-                                                                                        if (err) {
-                                                                                                res.status(500).json({
-                                                                                                        status:
-                                                                                                                'failed',
-                                                                                                        error: err,
-                                                                                                        redirect:
-                                                                                                                '/auth/register',
-                                                                                                });
-                                                                                                logger.auth.error(err);
-                                                                                        } else {
-                                                                                                res.status(200).json({
-                                                                                                        status: 'ok',
-                                                                                                        redirect: '/',
-                                                                                                });
-                                                                                                logger.auth.info(
-                                                                                                        `Created Account: ${user}`
-                                                                                                );
-                                                                                        }
+                                                if (err) {
+                                                                safeRespond(500, {
+                                                                        status:
+                                                                                'failed',
+                                                                        error: err,
+                                                                        redirect:
+                                                                                '/auth/register',
+                                                                });
+                                                                logger.auth.error(err);
+                                                        } else {
+                                                                safeRespond(200, {
+                                                                        status: 'ok',
+                                                                        redirect: '/',
+                                                                });
+                                                                logger.auth.info(
+                                                                        `Created Account: ${user}`
+                                                                );
+                                                        }
                                                                                 });
                                                                         } else {
                                                                                 logger.auth.error(err);
-                                                                                res.status(500).json({
+                                                                                safeRespond(500, {
                                                                                         status: 'failed',
                                                                                         error: err,
                                                                                         redirect: '/auth/register',
@@ -262,7 +269,7 @@ router.route('/register')
                                                         })
                                                         .catch(err => {
                                                                 logger.auth.error(err);
-                                                                res.status(400).json({
+                                                                safeRespond(400, {
                                                                         status: 'failed',
                                                                         error: 'invalid data',
                                                                 });

@@ -32,16 +32,40 @@ function run(trigger, scope, data, config, callback) {
     return callback(data);
   }
 
+  // Per-alias filtering
+  let pConf = data.pluginconf && data.pluginconf.Webhook;
+  let filterMode = config.filterMode && config.filterMode.value || '2'; // default: all messages
+  let aliasEnabled = pConf && pConf.enable;
+
+  if (filterMode === '0') {
+    // Per alias only
+    if (!aliasEnabled) {
+      return callback(data);
+    }
+  } else if (filterMode === '1') {
+    // Defined aliases only
+    if (!data.alias_id || !aliasEnabled) {
+      return callback(data);
+    }
+  }
+  // filterMode === '2' (all messages) — skip alias check
+
   if (isDuplicate(data.message)) {
     return callback(data);
+  }
+
+  // Use per-alias URL override if set
+  let targetURL = config.webhookURL;
+  if (aliasEnabled && pConf.webhookURL) {
+    targetURL = pConf.webhookURL;
   }
 
   const payload = buildPayload(data, config);
   const headers = buildHeaders(config);
 
-  logger.main.debug('Webhook: Forwarding to ' + config.webhookURL);
+  logger.main.debug('Webhook: Forwarding to ' + targetURL);
 
-  axios.post(config.webhookURL, payload, { headers, timeout: 8000 })
+  axios.post(targetURL, payload, { headers, timeout: 8000 })
     .then(() => { logger.main.info('Webhook: Message forwarded successfully'); })
     .catch(error => {
       if (error.response) {

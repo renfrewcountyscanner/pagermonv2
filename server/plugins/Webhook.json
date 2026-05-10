@@ -40,7 +40,32 @@
       "label": "Payload Template",
       "description": "Generic mode only. Template string with {field} placeholders. Available fields: address, message, source, timestamp, alias, agency, icon, color",
       "type": "text"
+    },
+    {
+      "name": "filterMode",
+      "label": "Filter Mode",
+      "description": "Filter mode to use (all messages, defined aliases, per alias only)",
+      "type": "select",
+      "options": [
+        {"value": "0", "text": "Per alias only"},
+        {"value": "1", "text": "Defined aliases"},
+        {"value": "2", "text": "All messages"}
+      ],
+      "required": true
     }
   ],
-  "aliasConfig": []
+  "aliasConfig": [
+    {
+      "name": "enable",
+      "label": "Enable",
+      "description": "Enable sending messages that match this alias via Webhook",
+      "type": "checkbox"
+    },
+    {
+      "name": "webhookURL",
+      "label": "Override Webhook URL",
+      "description": "Optional. Use a different webhook URL for this alias. Leave blank to use the global URL.",
+      "type": "text"
+    }
+  ]
 }

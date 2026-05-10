@@ -922,8 +922,8 @@ router.route('/capcodes')
           }
         })
         .catch((err) => {
-          logger.main.error(err)
-            .status(500).send(err);
+          logger.main.error(err);
+          res.status(500).send(err);
         })
       logger.main.debug(util.format('%o', req.body || 'no request body'));
     } else {

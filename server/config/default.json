@@ -8,7 +8,8 @@
     "searchLocation": "bottom",
     "theme": "default",
     "monitorName": "PagerMon",
-    "faKey": "changeme"
+    "faKey": "changeme",
+    "secureCookie": false
   },
   "database": {
     "file": "./messages.db",
@@ -120,7 +121,11 @@
       "authToken": "",
       "mode": "n8n",
       "genericHeaders": "",
-      "genericPayloadTemplate": ""
+      "genericPayloadTemplate": "",
+      "filterMode": {
+        "value": "2",
+        "text": "All messages"
+      }
     },
     "Template": {
       "enable": false

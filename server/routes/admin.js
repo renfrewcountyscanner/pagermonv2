@@ -28,6 +28,47 @@ router.use(bodyParser.urlencoded({     // to support URL-encoded bodies
     extended: true
 }));
 
+// Fields that must never be overwritten via the settings API
+const PROTECTED_FIELDS = ['encPass', 'sessionSecret', 'keys'];
+
+function sanitizeSettings(settings) {
+    // Return a shallow copy without sensitive fields
+    let safe = { ...settings };
+    if (safe.auth) {
+        safe.auth = { ...safe.auth };
+        delete safe.auth.encPass;
+        delete safe.auth.keys;
+    }
+    if (safe.global) {
+        safe.global = { ...safe.global };
+        delete safe.global.sessionSecret;
+    }
+    return safe;
+}
+
+function mergeSettings(current, incoming) {
+    // Deep merge that preserves protected fields
+    let merged = JSON.parse(JSON.stringify(current));
+    
+    for (let section in incoming) {
+        if (!merged[section]) merged[section] = {};
+        if (typeof incoming[section] === 'object' && !Array.isArray(incoming[section])) {
+            for (let key in incoming[section]) {
+                if (section === 'auth' && PROTECTED_FIELDS.includes(key)) {
+                    continue; // skip protected auth fields
+                }
+                if (section === 'global' && PROTECTED_FIELDS.includes(key)) {
+                    continue; // skip protected global fields
+                }
+                merged[section][key] = incoming[section][key];
+            }
+        } else {
+            merged[section] = incoming[section];
+        }
+    }
+    return merged;
+}
+
 router.route('/settingsData')
     .get(authHelper.isAdmin, function (req, res, next) {
         nconf.load();
@@ -46,16 +87,16 @@ router.route('/settingsData')
             themes.push(file)
         });
         // logger.main.debug(util.format('Plugin Config:\n\n%o',plugins));
-        let data = { "settings": settings, "plugins": plugins, "themes": themes }
+        let data = { "settings": sanitizeSettings(settings), "plugins": plugins, "themes": themes }
         res.json(data);
     })
     .post(authHelper.isAdmin, function (req, res, next) {
         nconf.load();
-        if (req.body) {
-            //console.log(req.body);
+        if (req.body && typeof req.body === 'object') {
             var currentConfig = nconf.get();
+            var merged = mergeSettings(currentConfig, req.body);
             fs.writeFileSync(conf_backup, JSON.stringify(currentConfig, null, 2));
-            fs.writeFileSync(confFile, JSON.stringify(req.body, null, 2));
+            fs.writeFileSync(confFile, JSON.stringify(merged, null, 2));
             nconf.load();
             res.status(200).send({ 'status': 'ok' });
         } else {

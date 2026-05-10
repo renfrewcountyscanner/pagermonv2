@@ -29,7 +29,7 @@ var flash    = require('connect-flash');
 
 process.on('SIGINT', function() {
     console.log( "\nGracefully shutting down from SIGINT (Ctrl-C)" );
-    process.exit(1);
+    process.exit(0);
 });
 
 // create config file if it does not exist, and set defaults
@@ -103,7 +103,7 @@ var app = express();
     // view engine setup
     app.set('views', path.join(__dirname,'themes',theme, 'views'));
     app.set('view engine', 'ejs');
-    app.set('trust proxy', 'loopback, linklocal, uniquelocal');
+    app.set('trust proxy', ['loopback', 'linklocal', 'uniquelocal']);
 
 
 
@@ -194,7 +194,7 @@ var sessSet = {
     cookie: {
         maxAge: 7 * 24 * 60 * 60 * 1000, // 1 week
         httpOnly: true,
-        secure: false, // set to true only when running HTTPS directly; proxy handles SSL
+        secure: nconf.get('global:secureCookie') || process.env.SECURE_COOKIE === 'true' || false,
         sameSite: 'lax'
     },
     store: new SQLiteStore,
