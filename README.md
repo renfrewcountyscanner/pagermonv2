@@ -36,18 +36,6 @@ The UI is built on a Node/Express/Vue 3/Bootstrap stack, while the client script
 
 ---
 
-## Screenshots
-
-| Messages View | Live Log |
-|:---:|:---:|
-| ![Messages](screenshots/messages.png) | ![Live Log](screenshots/livelog.png) |
-
-| Admin Settings | Aliases |
-|:---:|:---:|
-| ![Admin Settings](screenshots/admin-settings.png) | ![Aliases](screenshots/aliases.png) |
-
----
-
 ## Quick Start (One-Line Install)
 
 ```bash
