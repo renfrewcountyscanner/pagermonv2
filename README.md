@@ -28,7 +28,7 @@ The UI is built on a Node/Express/Vue 3/Bootstrap stack, while the client script
   - SMTP Email
   - Regex Filters & Replace
   - Message Repeat
-  - Simple & Advanced Webhooks
+  - Simple & Generic Webhooks
 
 ## Screenshots
 

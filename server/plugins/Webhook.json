@@ -1,5 +1,5 @@
 {
-  "name": "FirePageWebhook",
+  "name": "Webhook",
   "description": "Webhook forwarder — sends messages to n8n or any HTTP endpoint. Deduplication is controlled via global Settings.",
   "disable": false,
   "trigger": "message",

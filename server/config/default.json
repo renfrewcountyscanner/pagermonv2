@@ -114,15 +114,13 @@
       "sendIcon": false,
       "sendColor": false
     },
-    "AdvancedWebhook": {
+    "Webhook": {
       "enable": false,
-      "URL": "",
-      "contentType": "application/json",
-      "filterMode": {
-        "value": "2",
-        "text": "All messages"
-      },
-      "contentTemplate": ""
+      "webhookURL": "",
+      "authToken": "",
+      "mode": "n8n",
+      "genericHeaders": "",
+      "genericPayloadTemplate": ""
     },
     "Template": {
       "enable": false

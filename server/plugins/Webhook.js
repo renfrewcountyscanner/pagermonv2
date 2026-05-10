@@ -19,7 +19,7 @@ function buildHeaders(config) {
     try {
       Object.assign(headers, JSON.parse(config.genericHeaders));
     } catch (e) {
-      logger.main.error('FirePageWebhook: Invalid genericHeaders JSON: ' + e.message);
+      logger.main.error('Webhook: Invalid genericHeaders JSON: ' + e.message);
     }
   } else if (config.authToken) {
     headers['Authorization'] = config.authToken;
@@ -39,17 +39,17 @@ function run(trigger, scope, data, config, callback) {
   const payload = buildPayload(data, config);
   const headers = buildHeaders(config);
 
-  logger.main.debug('FirePageWebhook: Forwarding to ' + config.webhookURL);
+  logger.main.debug('Webhook: Forwarding to ' + config.webhookURL);
 
   axios.post(config.webhookURL, payload, { headers, timeout: 8000 })
-    .then(() => { logger.main.info('FirePageWebhook: Message forwarded successfully'); })
+    .then(() => { logger.main.info('Webhook: Message forwarded successfully'); })
     .catch(error => {
       if (error.response) {
-        logger.main.error('FirePageWebhook: HTTP ' + error.response.status + ' — ' + JSON.stringify(error.response.data));
+        logger.main.error('Webhook: HTTP ' + error.response.status + ' — ' + JSON.stringify(error.response.data));
       } else if (error.request) {
-        logger.main.error('FirePageWebhook: No response from webhook: ' + error.message);
+        logger.main.error('Webhook: No response from webhook: ' + error.message);
       } else {
-        logger.main.error('FirePageWebhook: Request error: ' + error.message);
+        logger.main.error('Webhook: Request error: ' + error.message);
       }
     });
 
