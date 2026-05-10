@@ -30,9 +30,19 @@ var hostname = nconf.get('hostname');
 var apikey = nconf.get('apikey');
 var identifier = nconf.get('identifier');
 var sendFunctionCode = nconf.get('sendFunctionCode') || false;
-var useTimestamp = nconf.get('useTimestamp') || true;
-var EASOpts = nconf.get('EAS'); // Import EAS Config Object Ref Pull 435
+var useTimestamp = nconf.get('useTimestamp');
+if (useTimestamp === undefined) {
+    useTimestamp = true;
+}
+var EASOpts = nconf.get('EAS') || {};
 
+// Basic config validation
+if (!hostname || hostname === 'http://127.0.0.1:3000') {
+    console.error('WARNING: hostname is not configured in config.json');
+}
+if (!apikey || apikey === 'changeme') {
+    console.error('WARNING: apikey is not configured in config.json');
+}
 
 //Check if hostname is in a valid format - currently only removes trailing slash - possibly expand to validate the whole URI? 
 if(hostname.substr(-1) === '/') {
@@ -41,10 +51,7 @@ if(hostname.substr(-1) === '/') {
   var uri = hostname+'/api/messages'
 }
 
-var http = require('http');
-var request = require('request');
-require('request').debug = true;
-var rp = require('request-promise-native');
+var axios = require('axios');
 var moment = require('moment');
 
 var colors = require('colors/safe');
@@ -136,17 +143,17 @@ rl.on('line', (line) => {
                 trimMessage = message;
             }
         }
-    } else if (line.match(/(EAS[:|]|ZCZC-)/)) {                                                     // Adds EAS US/CA SAME Message Support          //Matches "EAS: ZCZC-ORG-EEE-PSSCCC+TTTT-JJJHHMM-CALL/FM -" OR "ZCZC-ORG-EEE-PSSCCC+TTTT-JJJHHMM-CALL/FM -" This allows future proofing or alternative feeding
-        var decodedMessage = SAME.decode(line, EASOpts.excludeEvents, EASOpts.includeFIPS);          // Returns a object with all the info
+    } else if (line.match(/(EAS[:|]|ZCZC-)/)) {
+        var decodedMessage = SAME.decode(line, EASOpts.excludeEvents, EASOpts.includeFIPS);
         if (decodedMessage) {
-            if (EASOpts.addressAddType) {                                                             // Add type to address usefull for aleting to pushover, so a severe thunderstorm watch is KOAX-WXR-A and severe thunderstorm warning is KOAX-WXR-W // This allows easy alert filtering if useing pushover or something similar 
-                address = decodedMessage["LLLL-ORG"] + '-' + decodedMessage["type"];                // Addresses are the following schema LLLL-ORG-type so for the exaple following the address is "KOAX-WXR-W" :  ZCZC-WXR-TOR-031109+0015-3650000-KOAX/NWS -
+            if (EASOpts.addressAddType) {
+                address = decodedMessage["LLLL-ORG"] + '-' + decodedMessage["type"];
             } else {
-                address = decodedMessage["LLLL-ORG"]                                                 // Addresses are the following schema LLLL-ORG      so for the exaple following the address is "KOAX-WXR"   :  ZCZC-WXR-TOR-031109+0015-3650000-KOAX/NWS -
+                address = decodedMessage["LLLL-ORG"];
             }
-            message = decodedMessage
-            trimMessage = decodedMessage["MESSAGE"]
-            datetime = moment().unix();                                                               // Just get current time as any EAS will likely be effective at time of transmission
+            message = decodedMessage;
+            trimMessage = decodedMessage["MESSAGE"];
+            datetime = moment().unix();
         } else {
           address = '';
           message = false;
@@ -178,27 +185,29 @@ rl.on('line', (line) => {
   console.log('Input died!');
 });
 
+var shuttingDown = false;
+
 var sendPage = function(message,retries) {
-  var options = {
-    method: 'POST',
-    uri: uri,
+  if (shuttingDown && retries === 0) {
+    return;
+  }
+  axios.post(uri, message, {
     headers: {
       'X-Requested-With': 'XMLHttpRequest',
       'User-Agent': 'PagerMon reader.js',
-      apikey: apikey
+      'apikey': apikey
     },
-    form: message
-  };
-  rp(options)
-  .then(function (body) {
-    // console.log(colors.success('Message delivered. ID: '+body)); 
+    timeout: 10000
+  })
+  .then(function () {
+    // console.log(colors.success('Message delivered. ID: '+body));
   })
   .catch(function (err) {
-    console.log(colors.yellow('Message failed to deliver. '+err));
+    console.log(colors.yellow('Message failed to deliver. '+err.message));
     if (retries < 10) {
       var retryTime = Math.pow(2, retries) * 1000;
       retries++;
-      console.log(colors.yellow(`Retrying in ${retryTime} ms`));
+      console.log(colors.yellow('Retrying in '+retryTime+' ms'));
       setTimeout(sendPage, retryTime, message, retries);
     } else {
       console.log(colors.yellow('Message failed to deliver after 10 retries, giving up'));
@@ -209,3 +218,17 @@ var sendPage = function(message,retries) {
 var padDigits = function(number, digits) {
     return Array(Math.max(digits - String(number).length + 1, 0)).join(0) + number;
 };
+
+function shutdown() {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  console.log('\nShutting down gracefully...');
+  rl.close();
+  // Give in-flight requests a moment to finish or retry
+  setTimeout(function() {
+    process.exit(0);
+  }, 3000);
+}
+
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);

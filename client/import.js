@@ -34,11 +34,8 @@ var apikey = nconf.get('apikey');
 var uri = hostname+"/api/capcodes";
 // Now scroll down and set the agency and color config according to your needs
 
-var http = require('http');
 var parse = require('csv-parse');
-var request = require('request');
-require('request').debug = true
-var rp = require('request-promise-native');
+var axios = require('axios');
 
 var colors = require('colors/safe');
 colors.setTheme({
@@ -192,21 +189,24 @@ rl.on('line', (line) => {
           formData.pluginconf = pluginconf;
         
         console.log('Sending capcode: '+JSON.stringify(formData));
-        var options = {
-        method: 'POST',
-        uri: uri,
-        headers: {
-          'X-Requested-With': 'XMLHttpRequest',
-          apikey: apikey
-        },
-          form: formData
-        };
-        rp(options)
-        .then(function (body) {
-            console.log(colors.success('Success! '+body)); 
+        var params = new URLSearchParams();
+        for (var key in formData) {
+          if (formData.hasOwnProperty(key)) {
+            params.append(key, formData[key]);
+          }
+        }
+        axios.post(uri, params.toString(), {
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+            'apikey': apikey,
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }
+        })
+        .then(function (res) {
+            console.log(colors.success('Success! '+res.data));
         })
         .catch(function (err) {
-            console.log(colors.error('Fail! '+err));
+            console.log(colors.error('Fail! '+(err.message || err)));
         });
       }
     });
