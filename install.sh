@@ -19,17 +19,42 @@ die()  { printf "%b\n" "${RED}[X]${NC} $1"; exit 1; }
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# ── 0. Check OS compatibility ──────────────────────────────────
+OS="$(uname -s)"
+if [ "$OS" != "Linux" ]; then
+  die "PagerMon requires Linux. Detected: $OS"
+fi
+
+if command -v apt-get &>/dev/null; then
+  PKG_MGR="apt"
+elif command -v dnf &>/dev/null; then
+  PKG_MGR="dnf"
+elif command -v pacman &>/dev/null; then
+  PKG_MGR="pacman"
+elif command -v zypper &>/dev/null; then
+  PKG_MGR="zypper"
+elif command -v apk &>/dev/null; then
+  PKG_MGR="apk"
+else
+  PKG_MGR="unknown"
+fi
+
+if [ "$PKG_MGR" = "unknown" ]; then
+  warn "Could not detect a supported package manager."
+  warn "Docker will need to be installed manually if missing."
+fi
+
 # ── 1. Check / install Docker ──────────────────────────────────
 if ! command -v docker &>/dev/null; then
   log "Docker not found. Installing..."
-  if command -v apt-get &>/dev/null; then
-    apt-get update -qq && apt-get install -y -qq docker.io docker-compose
-  elif command -v dnf &>/dev/null; then
-    dnf install -y docker docker-compose
-  elif command -v pacman &>/dev/null; then
-    pacman -S --noconfirm docker docker-compose
-  else
-    die "Cannot detect package manager. Install Docker manually: https://docs.docker.com/engine/install/"
+  case "$PKG_MGR" in
+    apt)    apt-get update -qq && apt-get install -y -qq docker.io docker-compose ;;
+    dnf)    dnf install -y docker docker-compose ;;
+    pacman) pacman -S --noconfirm docker docker-compose ;;
+    zypper) zypper install -y docker docker-compose ;;
+    apk)    apk add --no-cache docker docker-compose ;;
+    *)      die "Cannot install Docker automatically. Install manually: https://docs.docker.com/engine/install/" ;;
+  esac
   fi
   systemctl start docker 2>/dev/null || true
   systemctl enable docker 2>/dev/null || true
