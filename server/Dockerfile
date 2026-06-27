@@ -9,7 +9,7 @@ FROM node:18-alpine AS vue-builder
 WORKDIR /app/vue-client
 
 COPY themes/default/vue-client/package*.json ./
-RUN npm ci
+RUN npm install
 
 COPY themes/default/vue-client/ ./
 RUN npm run build
