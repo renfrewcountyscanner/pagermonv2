@@ -4,8 +4,6 @@ PagerMon is an API-driven client/server framework for receiving, parsing, storin
 
 The system includes a **real-time public map** with geocoded call locations, colored incident-type markers, a dynamic filter bar, and Socket.IO live updates.
 
-**Live demo:** [https://pagermonv2.firepage.ca](https://pagermonv2.firepage.ca)
-
 ---
 
 ## Features

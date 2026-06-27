@@ -6,7 +6,7 @@ services:
     environment:
       POSTGRES_DB: ${PG_DATABASE:-pagermon}
       POSTGRES_USER: ${PG_USER:-pagermon}
-      POSTGRES_PASSWORD: ${PG_PASSWORD:-change-me}
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-}
     volumes:
       - ./postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -34,9 +34,9 @@ services:
       - DATABASE__PORT=5432
       - DATABASE__DATABASE=${PG_DATABASE:-pagermon}
       - DATABASE__USERNAME=${PG_USER:-pagermon}
-      - DATABASE__PASSWORD=${PG_PASSWORD:-change-me}
+      - DATABASE__PASSWORD=${PG_PASSWORD:-}
       - PUBLICMAP__BASEURL=${PUBLIC_MAP_BASE_URL:-http://localhost:5000}
-      - PUBLICMAP__APIKEY=${PUBLIC_MAP_API_KEY:-change-me}
+      - PUBLICMAP__APIKEY=${PUBLIC_MAP_API_KEY:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -61,10 +61,10 @@ services:
       - PG_PORT=5432
       - PG_DATABASE=${PG_DATABASE:-pagermon}
       - PG_USER=${PG_USER:-pagermon}
-      - PG_PASSWORD=${PG_PASSWORD:-change-me}
+      - PG_PASSWORD=${PG_PASSWORD:-}
       - BASE_URL=${PUBLIC_MAP_BASE_URL:-http://localhost:5000}
-      - SECRET_KEY=${MAP_SECRET_KEY:-change-me}
-      - PUBLIC_MAP_API_KEY=${PUBLIC_MAP_API_KEY:-change-me}
+      - SECRET_KEY=${MAP_SECRET_KEY:-}
+      - PUBLIC_MAP_API_KEY=${PUBLIC_MAP_API_KEY:-}
       - MAP_LAT=${MAP_LAT:-45.42}
       - MAP_LNG=${MAP_LNG:-75.70}
     depends_on:

@@ -8,9 +8,11 @@ cd pagermonv2
 ./install.sh
 ```
 
-`install.sh` auto-generates `.env` with random secrets, builds Docker images, starts all services, and runs database migrations.
+`install.sh` auto-generates `.env` with random secrets and sensible defaults, builds Docker images, starts all services, and runs database migrations.
 
-## What You Must Edit After Install
+**No editing required** for local testing. The map will center at 0,0 until you set your area coordinates.
+
+## Production Setup
 
 Edit `.env` with values for your area:
 
@@ -20,11 +22,10 @@ Edit `.env` with values for your area:
 | `MAP_LAT` | Latitude of your dispatch center |
 | `MAP_LNG` | Longitude of your dispatch center |
 | `PUBLIC_MAP_BASE_URL` | Public URL for the map service (for n8n/Discord image links) |
-| `RTL_FREQ` | Your pager frequency (e.g. `148.5875M`) |
 
 Then restart:
 ```bash
-docker compose up -d
+docker compose down && docker compose up -d
 ```
 
 ## Default Login
