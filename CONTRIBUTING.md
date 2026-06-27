@@ -101,4 +101,4 @@ Tests use Mocha + Chai. Test database is in `server/test/messages.db` and is res
 
 ## Getting Help
 
-Open a [GitHub Discussion](https://github.com/renfrewcountyscanner/pagermonv2/discussions) or [issue](https://github.com/renfrewcountyscanner/pagermonv2/issues).
+Open a [GitHub Issue](https://github.com/renfrewcountyscanner/pagermonv2/issues) or [issue](https://github.com/renfrewcountyscanner/pagermonv2/issues).

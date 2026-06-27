@@ -28,12 +28,12 @@ The system includes a **real-time public map** with geocoded call locations, col
 ```bash
 git clone https://github.com/renfrewcountyscanner/pagermonv2.git
 cd pagermonv2
-cp .env.example .env
-# Edit .env — set PG_PASSWORD, MAP_SECRET_KEY, and PUBLIC_MAP_API_KEY
 ./install.sh
 ```
 
-The installer handles Docker setup, image builds, database migrations, and seeding. Once complete:
+`install.sh` auto-generates `.env` with random secrets, builds Docker images, starts PostgreSQL + PagerMon + Live Map, and runs database migrations. No manual config needed for local testing.
+
+For production: edit `.env` to set `TZ`, `MAP_LAT`, `MAP_LNG`, and `PUBLIC_MAP_BASE_URL` for your area, then `docker compose up -d`.
 
 | Service | URL |
 |---------|-----|
@@ -171,7 +171,7 @@ git clone https://github.com/renfrewcountyscanner/pagermonv2.git
 cd pagermonv2/server
 npm install
 cp config/default.json config/config.json
-# Edit config/config.json — set database.server to your PostgreSQL host, change sessionSecret, set API keys
+# REQUIRED: edit config/config.json — set a random sessionSecret (the server refuses to start without it), database.server, and API keys
 cd themes/default/vue-client && npm install && npm run build && cd ../..
 node app.js
 ```

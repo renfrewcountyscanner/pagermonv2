@@ -62,18 +62,18 @@ PUBLIC_MAP_BASE_URL=http://localhost:5000
 RTL_FREQ=148.5875M
 PG_DATABASE=pagermon
 PG_USER=pagermon
-PG_PASSWORD=RANDOM
-MAP_SECRET_KEY=RANDOM
-PUBLIC_MAP_API_KEY=RANDOM
+PG_PASSWORD=__RANDOM_16__
+MAP_SECRET_KEY=__RANDOM_32__
+PUBLIC_MAP_API_KEY=__RANDOM_24__
 SERVER_PORT=3000
 MAP_PORT=5000
 POCSAG_MODE=POCSAG512
 RTL_DEVICE=0
 EOF
   # Generate actual random values
-  sed -i "s/RANDOM/$(openssl rand -hex 16)/" "$SCRIPT_DIR/.env"
-  sed -i "s/RANDOM/$(openssl rand -hex 32)/" "$SCRIPT_DIR/.env"
-  sed -i "s/RANDOM/$(openssl rand -hex 24)/" "$SCRIPT_DIR/.env"
+  sed -i "s/__RANDOM_16__/$(openssl rand -hex 16)/" "$SCRIPT_DIR/.env"
+  sed -i "s/__RANDOM_32__/$(openssl rand -hex 32)/" "$SCRIPT_DIR/.env"
+  sed -i "s/__RANDOM_24__/$(openssl rand -hex 24)/" "$SCRIPT_DIR/.env"
   log ".env created — no editing required for local testing."
   log "For production: set TZ, MAP_LAT/LNG, and PUBLIC_MAP_BASE_URL in .env"
 else

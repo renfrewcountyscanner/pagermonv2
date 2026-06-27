@@ -8,7 +8,7 @@
     "searchLocation": "bottom",
     "theme": "default",
     "monitorName": "PagerMon",
-    "faKey": "changeme",
+    "faKey": "",
     "mapLat": 45.42,
     "mapLng": -75.70,
     "timezone": "America/Toronto",
