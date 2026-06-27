@@ -55,11 +55,12 @@ if ! command -v docker &>/dev/null; then
     apk)    apk add --no-cache docker docker-compose ;;
     *)      die "Cannot install Docker automatically. Install manually: https://docs.docker.com/engine/install/" ;;
   esac
-  fi
-  systemctl start docker 2>/dev/null || true
-  systemctl enable docker 2>/dev/null || true
   log "Docker installed."
 fi
+
+# Ensure Docker is running
+systemctl start docker 2>/dev/null || true
+systemctl enable docker 2>/dev/null || true
 
 if ! (docker compose version &>/dev/null || docker-compose --version &>/dev/null); then
   die "docker compose is required. Run: pip install docker-compose"
