@@ -240,18 +240,25 @@ The script exports all messages, capcodes, and users from SQLite and imports the
 
 ---
 
-## Upgrading from Docker Hub
+## Upgrading
 
-Pre-built images are available. Edit `.env`, then:
+When a new version is published, update your local copy:
 
 ```bash
-docker compose pull
+git pull
+docker compose build --no-cache
 docker compose up -d
 ```
 
-Image builds are also available via GitHub Actions (`Image-Build.yml` workflow).
+Your data persists in `postgres-data/`, `server-data/`, and `client-data/` directories. Database migrations run automatically on startup.
 
----
+To update without rebuilding the Vue frontend (faster, if only backend changed):
+
+```bash
+git pull
+docker compose build pagermon-server
+docker compose up -d
+```
 
 ## Support
 
