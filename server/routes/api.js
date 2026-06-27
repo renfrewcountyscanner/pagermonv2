@@ -169,6 +169,9 @@ router.get('/appconfig', function (req, res) {
     monitorName: nconf.get('global:monitorName') || 'PagerMon',
     registration: !!nconf.get('auth:registration'),
     apiSecurity: !!nconf.get('messages:apiSecurity'),
+    timezone: nconf.get('global:timezone') || 'America/Toronto',
+    mapLat: nconf.get('global:mapLat') || 45.42,
+    mapLng: nconf.get('global:mapLng') || -75.70,
   });
 });
 
@@ -335,6 +338,10 @@ router.route('/messages')
       var adminShow = nconf.get('messages:adminShow');
       var data = req.body;
       data.pluginData = {};
+      var isRetrigger = !!data.retrigger;
+
+      // ── Retrigger: bypass dedup ──
+      if (!isRetrigger) {
 
       if (filterDupes) {
         // this is a bad solution and tech debt that will bite us in the ass if we ever go HA, but that's a problem for future me and that guy's a dick
@@ -367,6 +374,7 @@ router.route('/messages')
           msgBuffer.shift();
         }
         msgBuffer.push({ message: data.message, datetime: data.datetime, address: data.address });
+      }
       }
 
       // send data to pluginHandler before proceeding
@@ -434,7 +442,7 @@ router.route('/messages')
             }
           })
           .then((row) => {
-            if (row.length > 0 && filterDupes) {
+            if (row.length > 0 && filterDupes && !isRetrigger) {
               logger.main.info(util.format('Ignoring duplicate: %o', message));
               res.status(200);
               res.send('Ignoring duplicate');
@@ -498,6 +506,7 @@ router.route('/messages')
 
                   if (insert == true) {
                     var insertmsg = { address: address, message: message, timestamp: datetime, source: source, alias_id: alias_id }
+                    if (isRetrigger) insertmsg.message = '[TEST RETRIGGER] ' + insertmsg.message;
                     db('messages').insert(insertmsg).returning('id')
                       .then((result) => {
                         // emit the full message
@@ -669,6 +678,41 @@ router.route('/messages')
   });
 
 
+router.route('/messages/:id/retrigger')
+  .post(authHelper.isAdmin, function (req, res) {
+    db('messages').select('address', 'message', 'source', 'timestamp')
+      .where('id', req.params.id).first()
+      .then(function (row) {
+        if (!row) return res.status(404).json({ error: 'Message not found' });
+        var payload = {
+          address: row.address,
+          message: row.message,
+          source: row.source,
+          datetime: row.timestamp,
+          retrigger: true
+        };
+        var axios = require('axios').default;
+        var apikey = req.headers.apikey || '';
+        if (!apikey) {
+          nconf.load();
+          var keys = nconf.get('auth:keys') || [];
+          var selected = keys.find(function(k) { return k.selected; });
+          if (selected) apikey = selected.key;
+        }
+        var port = nconf.get('app:port') || 3000;
+        axios.post('http://127.0.0.1:' + port + '/api/messages', payload, {
+          headers: { 'Content-Type': 'application/json', 'apikey': apikey },
+          timeout: 30000
+        }).then(function (resp) {
+          res.status(200).send('' + resp.data);
+        }).catch(function (err) {
+          logger.main.error('Retrigger failed: ' + err.message);
+          res.status(500).send(err.message);
+        });
+      })
+      .catch(function (err) { logger.main.error(err); res.status(500).send(err); });
+  });
+
 router.route('/messages/:id')
   .get(authHelper.isLoggedInMessages, function (req, res, next) {
     nconf.load();
@@ -758,6 +802,8 @@ router.route('/messageSearch')
         qb.whereRaw('MATCH(messages.message, messages.address, messages.source) AGAINST (? IN BOOLEAN MODE)', ['"' + query + '"']);
       } else if (dbtype === 'oracledb' && query !== '') {
         qb.whereRaw('CONTAINS("messages"."message", ?, 1) > 0', [query]);
+      } else if (dbtype === 'pg' && query !== '') {
+        qb.whereRaw("search_vector @@ plainto_tsquery('english', ?)", [query]);
       } else {
         if (address !== '') qb.where(function () { this.where('messages.address', 'LIKE', address).orWhere('messages.source', address); });
         if (agency  !== '') qb.whereIn('messages.alias_id', function (sub) { sub.select('id').from('capcodes').where('agency', agency).where('ignore', 0); });
@@ -772,7 +818,10 @@ router.route('/messageSearch')
     var countPromise = useFTS
       ? db.raw('SELECT COUNT(*) as count FROM messages_search_index WHERE messages_search_index MATCH ?', [query])
           .then(function (r) { return [{ count: r[0]['COUNT(*)'] !== undefined ? r[0]['COUNT(*)'] : (r[0].count || 0) }]; })
-      : db.from('messages').count('* as count').modify(function (qb) { applyFilters(qb, false); });
+      : (dbtype === 'pg' && query !== '')
+        ? db.from('messages').count('* as count').whereRaw("search_vector @@ plainto_tsquery('english', ?)", [query])
+            .modify(function (qb) { if (dateFrom) qb.where('messages.timestamp', '>=', dateFrom); if (dateTo) qb.where('messages.timestamp', '<=', dateTo); })
+        : db.from('messages').count('* as count').modify(function (qb) { applyFilters(qb, false); });
 
     countPromise.then(function (countResult) {
       var totalCount = parseInt(countResult[0].count, 10) || 0;
@@ -960,6 +1009,21 @@ router.route('/capcodes/agency/:id')
         return next(err);
       })
   });
+
+router.get('/capcodes/stats', authHelper.isAdmin, function (req, res) {
+  var now = Math.floor(Date.now() / 1000);
+  var day = now - 86400;
+  var week = now - 604800;
+  db('capcodes')
+    .select('capcodes.id',
+      db.raw('MAX(messages.timestamp) as last_seen'),
+      db.raw('COUNT(CASE WHEN messages.timestamp > ' + day + ' THEN 1 END) as count_24h'),
+      db.raw('COUNT(CASE WHEN messages.timestamp > ' + week + ' THEN 1 END) as count_7d'))
+    .leftJoin('messages', 'capcodes.id', 'messages.alias_id')
+    .groupBy('capcodes.id')
+    .then(function (rows) { res.status(200).json(rows); })
+    .catch(function (err) { logger.main.error(err); res.status(500).send(err); });
+});
 
 router.route('/capcodes/:id')
   .get(authHelper.isAdmin, function (req, res, next) {
@@ -1605,6 +1669,238 @@ router.route('/user/:id')
     }
   });
 
+// ── Incident Types CRUD ───────────────────────────────────────────
+router.route('/incident-types/refresh')
+  .post(authHelper.isAdmin, function (req, res) {
+    var parsed = [];
+    db('messages').select('message', 'source').then(function (rows) {
+      rows.forEach(function (row) {
+        var text = row.message || '';
+        if (text.indexOf('[TEST RETRIGGER] ') === 0) {
+          text = text.substring(18);
+        }
+        var src = row.source || '';
+        var ict = '';
+        if (text.indexOf('\n') > 0) {
+          var firstLine = text.split('\n')[0].trim();
+          ict = firstLine.split('/')[0];
+        } else if (text.indexOf('INC:') === 0) {
+          var m = text.match(/TYP:(\S+)/);
+          if (m) ict = m[1];
+        }
+        if (ict && parsed.indexOf(ict) < 0) parsed.push(ict);
+      });
+      var now = Math.floor(Date.now() / 1000);
+      var inserts = parsed.map(function (name) {
+        var cat = 'Other', col = '#6c757d', letr = 'O';
+        var u = name.toUpperCase().replace(/[^A-Z0-9]/g, '');
+        if (u === 'WORKINGFIRE' || (u.includes('FIRE') && !u.startsWith('ALARM'))) { cat = 'Fire'; col = '#dc3545'; letr = u.includes('STRUCT') ? 'SF' : u.includes('VEHICL') ? 'VF' : u.includes('MINOR') ? 'MF' : u === 'WORKINGFIRE' ? 'WF' : 'F'; }
+        else if (u.startsWith('ALARM')) { cat = 'Alarms'; col = '#6f42c1'; letr = u.slice(5, 7) || 'AL'; }
+        else if (u === 'MEDICAL') { cat = 'Medical'; col = '#0d6efd'; letr = 'MED'; }
+        else if (u.startsWith('MVC')) { cat = 'Traffic'; col = '#ffc107'; letr = 'MVC'; }
+        else if (u === 'RESCUE') { cat = 'Rescue'; col = '#20c997'; letr = 'R'; }
+        else if (u.includes('HAZMAT')) { cat = 'HazMat'; col = '#fd7e14'; letr = 'HZ'; }
+        else if (u.includes('GAS')) { cat = 'Utilities'; col = '#8b4513'; letr = 'NG'; }
+        else if (u === 'ASSIST') { cat = 'Assist'; col = '#17a2b8'; letr = 'A'; }
+        else if (u === 'MUTUALAID') { cat = 'Mutual Aid'; col = '#e83e8c'; letr = 'MA'; }
+        else if (u === 'ALARMS') { cat = 'Alarms'; col = '#6f42c1'; letr = 'AL'; }
+        return { name: name, display_name: name, category: cat, color: col, pin_letter: letr, active: 1, created_at: now };
+      });
+      if (inserts.length === 0) return res.status(200).json({ status: 'ok', added: 0 });
+      var added = 0;
+      var remaining = inserts.length;
+      inserts.forEach(function (row) {
+        db('incident_types').insert(row).then(function () { added++; })
+          .catch(function (err) {
+            logger.main.error('Geocoder: Type insertion error: ' + err.message);
+          })
+          .finally(function () {
+            remaining--;
+            if (remaining === 0) res.status(200).json({ status: 'ok', added: added });
+          });
+      });
+    });
+  });
+
+router.post('/incident-types/batch', authHelper.isAdmin, function (req, res) {
+  var ids = req.body.ids || [];
+  var updates = {};
+  if (req.body.category) updates.category = req.body.category;
+  if (req.body.color) updates.color = req.body.color;
+  if (!ids.length || !Object.keys(updates).length) return res.status(400).json({ error: 'ids and at least one field required' });
+  db('incident_types').whereIn('id', ids).update(updates)
+    .then(function () { res.status(200).json({ status: 'ok', updated: ids.length }); })
+    .catch(function (err) { logger.main.error(err); res.status(500).send(err); });
+});
+
+router.route('/incident-types')
+  .get(authHelper.isAdmin, function (req, res) {
+    db.from('incident_types')
+      .select('*')
+      .orderBy('category')
+      .orderBy('name')
+      .then(function (rows) {
+        res.status(200).json(rows);
+      })
+      .catch(function (err) {
+        logger.main.error(err);
+        res.status(500).send(err);
+      });
+  })
+  .post(authHelper.isAdmin, function (req, res) {
+    if (!req.body.name) return res.status(400).json({ error: 'name is required' });
+    var id = req.body.id || null;
+    var row = {
+      name: req.body.name,
+      display_name: req.body.display_name || req.body.name,
+      category: req.body.category || 'Other',
+      color: req.body.color || '#6c757d',
+      pin_letter: (req.body.pin_letter || 'O').substring(0, 3),
+      active: req.body.active !== undefined ? req.body.active : 1,
+    };
+    db('incident_types')
+      .where('name', row.name)
+      .then(function (existing) {
+        if (existing.length > 0) {
+          return db('incident_types').where('name', row.name).update(row).returning('id');
+        } else {
+          row.created_at = Math.floor(Date.now() / 1000);
+          return db('incident_types').insert(row).returning('id');
+        }
+      })
+      .then(function (result) {
+        res.status(200).send({ status: 'ok', id: Array.isArray(result) ? result[0] : result });
+      })
+      .catch(function (err) {
+        logger.main.error(err);
+        res.status(500).send(err);
+      });
+  });
+
+router.route('/incident-types/:id')
+  .post(authHelper.isAdmin, function (req, res) {
+    if (!req.body.name) return res.status(400).json({ error: 'name is required' });
+    db('incident_types')
+      .where('id', req.params.id)
+      .update({
+        name: req.body.name,
+        display_name: req.body.display_name || req.body.name,
+        category: req.body.category || 'Other',
+        color: req.body.color || '#6c757d',
+        pin_letter: (req.body.pin_letter || 'O').substring(0, 3),
+        active: req.body.active !== undefined ? req.body.active : 1,
+      })
+      .then(function (updated) {
+        if (!updated || updated === 0) return res.status(404).json({ error: 'Not found' });
+        res.status(200).json({ status: 'ok' });
+      })
+      .catch(function (err) {
+        logger.main.error(err);
+        res.status(500).send(err);
+      });
+  })
+  .delete(authHelper.isAdmin, function (req, res) {
+    db('incident_types')
+      .where('id', req.params.id)
+      .del()
+      .then(function () {
+        res.status(200).json({ status: 'ok' });
+      })
+      .catch(function (err) {
+        logger.main.error(err);
+        res.status(500).send(err);
+      });
+  });
+
+router.get('/incident-types/map', function (req, res) {
+  db.from('incident_types')
+    .select('category')
+    .min('color as color')
+    .min('pin_letter as pin_letter')
+    .where('active', 1)
+    .groupBy('category')
+    .orderBy('category')
+    .then(function (rows) {
+      res.status(200).json({ categories: rows });
+    }).catch(function (err) {
+      logger.main.error(err);
+      res.status(500).send(err);
+    });
+});
+
+// ── Agency Location Config CRUD ──────────────────────────────────
+router.route('/geo-config')
+  .get(authHelper.isAdmin, function (req, res) {
+    db.from('agency_location_config')
+      .select('*')
+      .orderBy('sent_by')
+      .orderBy('priority', 'desc')
+      .then(function (rows) { res.status(200).json(rows); })
+      .catch(function (err) { logger.main.error(err); res.status(500).send(err); });
+  })
+  .post(authHelper.isAdmin, function (req, res) {
+    var id = req.body.id || null;
+    var row = {
+      sent_by: req.body.sent_by || '',
+      alias_pattern: req.body.alias_pattern || null,
+      city: req.body.city || '',
+      county: req.body.county || '',
+      state: req.body.state || '',
+      country: req.body.country || 'CA',
+      fallback_lat: req.body.fallback_lat || null,
+      fallback_lng: req.body.fallback_lng || null,
+      bounds_min_lat: req.body.bounds_min_lat || null,
+      bounds_max_lat: req.body.bounds_max_lat || null,
+      bounds_min_lng: req.body.bounds_min_lng || null,
+      bounds_max_lng: req.body.bounds_max_lng || null,
+      active: req.body.active !== undefined ? req.body.active : 1,
+      priority: req.body.priority || 5,
+    };
+    if (id) {
+      db('agency_location_config').where('id', id).update(row)
+        .then(function (updated) {
+          if (!updated || updated === 0) return res.status(404).json({ error: 'Not found' });
+          res.status(200).json({ status: 'ok', id: id });
+        }).catch(function (err) { logger.main.error(err); res.status(500).send(err); });
+    } else {
+      db('agency_location_config').insert(row).returning('id')
+        .then(function (result) { res.status(200).json({ status: 'ok', id: Array.isArray(result) ? result[0] : result }); })
+        .catch(function (err) { logger.main.error(err); res.status(500).send(err); });
+    }
+  });
+
+router.route('/geo-config/:id')
+  .get(authHelper.isAdmin, function (req, res) {
+    db('agency_location_config').where('id', req.params.id).first()
+      .then(function (row) { if (!row) return res.status(404).json({ error: 'Not found' }); res.status(200).json(row); })
+      .catch(function (err) { logger.main.error(err); res.status(500).send(err); });
+  })
+  .delete(authHelper.isAdmin, function (req, res) {
+    db('agency_location_config').where('id', req.params.id).del()
+      .then(function () { res.status(200).json({ status: 'ok' }); })
+      .catch(function (err) { logger.main.error(err); res.status(500).send(err); });
+  });
+
+// ── Admin Dashboard Stats ───────────────────────────────────────
+router.get('/admin-stats', authHelper.isAdmin, function (req, res) {
+  var now = Math.floor(Date.now() / 1000);
+  var midnight = Math.floor(new Date().setHours(0,0,0,0) / 1000);
+  Promise.all([
+    db('pager_calls').count('* as count').where('created_at', '>=', midnight),
+    db('messages').count('* as count').where('timestamp', '>=', midnight),
+    db('pager_calls').max('created_at as last_geocoded'),
+    db('incident_types').count('* as count').where('active', 1),
+  ]).then(function (r) {
+    res.status(200).json({
+      callsToday: parseInt(r[0][0].count) || 0,
+      messagesToday: parseInt(r[1][0].count) || 0,
+      lastGeocoded: r[2][0].last_geocoded || null,
+      activeTypes: parseInt(r[3][0].count) || 0,
+    });
+  }).catch(function (err) { logger.main.error(err); res.status(500).send(err); });
+});
+
+// ── Capcode Stats (last seen + activity) ─────────────────────────
 router.use([handleError]);
 
 module.exports = router;

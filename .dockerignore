@@ -1,0 +1,81 @@
+# ── Secrets & environment ───────────────────────────────────────
+.env
+*.env
+!server/.env.example
+!public_map/.env.example
+!.env.example
+
+# ── Data directories ────────────────────────────────────────────
+postgres-data/
+server-data/
+client-data/
+
+# ── Dependencies ─────────────────────────────────────────────────
+node_modules/
+server/node_modules/
+client/node_modules/
+public_map/venv/
+
+# ── Git ──────────────────────────────────────────────────────────
+.git/
+.gitignore
+.gitattributes
+.gitmodules
+
+# ── Build artifacts ─────────────────────────────────────────────
+**/dist/
+**/build/
+**/__pycache__/
+*.pyc
+*.pyo
+
+# ── Caches ───────────────────────────────────────────────────────
+.cache_pin_maps/
+.cache/
+.npm/
+.nyc_output/
+coverage/
+
+# ── Logs & runtime data ─────────────────────────────────────────
+*.log
+logs/
+server/logs/
+server/sessions/
+server/pids/
+pids/
+*.pid
+*.pid.lock
+
+# ── Editor/IDE ───────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── OS files ─────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Documentation (keep light images lean) ──────────────────────
+docs/
+screenshots/
+
+# ── Test & dev files ─────────────────────────────────────────────
+server/test/
+server/test.js
+*.test.js
+*.spec.js
+
+# ── PM2 ──────────────────────────────────────────────────────────
+ecosystem.config.js
+server/process.json
+server/process-default.json
+
+# ── Database files ───────────────────────────────────────────────
+*.db
+*.db.bak
+*.db-journal
+
+# ── CI/CD (not needed inside image) ─────────────────────────────
+.github/

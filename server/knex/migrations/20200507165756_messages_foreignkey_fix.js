@@ -2,7 +2,7 @@ var nconf = require('nconf');
 var confFile = './config/config.json';
 var dbtype = nconf.get('database:type')
 exports.up = function (db, Promise) {
-    if (dbtype == 'mysql') {
+    if (dbtype == 'mysql' || dbtype == 'pg') {
         return db.schema.table('messages', function (table) {
             table.dropForeign('alias_id')
         })

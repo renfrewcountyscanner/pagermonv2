@@ -50,8 +50,7 @@ function formatDate(val) {
 
 onMounted(async () => {
   loading.value = true
-  const r = await fetch('/api/user')
-  if (r.ok) users.value = await r.json()
+  try { const r = await fetch('/api/user'); if (r.ok) users.value = await r.json() } catch (_) {}
   loading.value = false
 })
 </script>

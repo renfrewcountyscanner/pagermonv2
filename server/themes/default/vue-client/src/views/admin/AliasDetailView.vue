@@ -5,7 +5,6 @@
       <h5 class="fw-bold mb-0">{{ isNew ? 'New Alias' : 'Edit Alias' }}</h5>
     </div>
 
-    <div v-if="saved" class="alert alert-success py-2">Saved successfully.</div>
     <div v-if="error" class="alert alert-danger py-2">{{ error }}</div>
 
     <div class="card shadow-sm mb-3">
@@ -84,7 +83,9 @@
 
     <div class="d-flex gap-2">
       <button class="btn btn-primary" :disabled="busy" @click="save">
-        <span v-if="busy" class="spinner-border spinner-border-sm me-2"></span>Save
+        <template v-if="busy"><span class="spinner-border spinner-border-sm me-2"></span>Saving…</template>
+        <template v-else-if="justSaved"><i class="bi bi-check-lg me-1"></i>Saved</template>
+        <template v-else>Save</template>
       </button>
       <router-link to="/admin/aliases" class="btn btn-outline-secondary">Cancel</router-link>
       <button v-if="!isNew" class="btn btn-outline-danger ms-auto" @click="showDelConfirm = true">Delete</button>
@@ -110,7 +111,7 @@ const addToast = inject('toast', () => {})
 const id = route.params.id
 const isNew = id === 'new'
 const busy = ref(false)
-const saved = ref(false)
+const justSaved = ref(false)
 const error = ref('')
 const showDelConfirm = ref(false)
 const aliasPlugins = ref([])
@@ -157,7 +158,7 @@ onMounted(async () => {
 })
 
 async function save() {
-  busy.value = true; saved.value = false; error.value = ''
+  busy.value = true; justSaved.value = false; error.value = ''
   const payload = { ...form, pluginconf: JSON.stringify(pluginconf) }
   // Both create and update go through POST: /api/capcodes for create, /api/capcodes/:id for update.
   const url = isNew ? '/api/capcodes' : `/api/capcodes/${id}`
@@ -171,7 +172,8 @@ async function save() {
       const d = await r.json()
       router.replace(`/admin/aliases/${d.id || d}`)
     }
-    saved.value = true
+    justSaved.value = true
+    setTimeout(function() { justSaved.value = false }, 2000)
     addToast('Alias saved')
   } else {
     error.value = 'Failed to save. Check the fields and try again.'

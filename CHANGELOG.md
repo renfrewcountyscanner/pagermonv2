@@ -1,3 +1,24 @@
+# 0.3.14 - 2025-06-26
+* **PostgreSQL migration** — default database backend is now PostgreSQL. SQLite support removed from server.
+* **Docker architecture** — 3 mandatory containers: postgres, pagermon-server, pagermon-public-map (client is optional profile).
+* **Public live map** — Flask + Socket.IO + Leaflet map server with real-time geocoded call markers, dynamic category filter bar, heatmap, live feed mode, notifications, dark/light theme, keyboard shortcuts, and permalink sharing.
+* **Geocoder plugin** — auto-extracts addresses from pager messages, geocodes via Nominatim (OpenStreetMap), and pushes to the public map with dedup support.
+* **Incident type management** — admin UI for configuring call type categories, colors (hex picker), and pin letters. Auto-discovers types from existing message history.
+* **Agency location config** — admin UI for mapping pager sources to geographic context (city/county/state/country) to bias Nominatim geocoding.
+* **Map pin renderer** — static PNG map images for Discord/n8n embeds with configurable pin colors.
+* **n8n/webhook map URL** — webhook payloads include map_image_url when Geocoder is enabled.
+* **1x1 transparent placeholder** — `/map-image/placeholder` endpoint for failed geocodes (prevents broken image tags in apps like Discord).
+* **One-command install** — `./install.sh` handles Docker setup, builds, migrations, seeding, and prints URLs.
+* **Environment variable configuration** — Docker stack fully configurable via `.env` file.
+* **Bind-mounted data persistence** — `postgres-data/`, `server-data/`, `client-data/` survive container destruction.
+* **PostgreSQL full-text search** — tsvector + GIN index replaces SQLite FTS3.
+* **Session store** — connect-pg-simple replaces connect-sqlite3.
+* **Added** `CONTRIBUTING.md`, updated `README.md` with full Docker/mapping documentation.
+* **Fixed** plugin execution order — Geocoder runs before Webhook so map URLs are included in n8n payloads.
+* **Fixed** env var case mismatch (`publicmap` vs `publicMap`) — all lowercase for nconf consistency.
+* **Fixed** session store connection string — uses pg.Pool config object (no URI-encoding issues with special chars).
+* **Various security fixes** — removed hardcoded passwords from source, added `.dockerignore`, expanded `.gitignore`.
+
 # 0.3.13 - 2023-09-04
 * Add Config option to fix FA icon's no longer loading. @marshyonline
 

@@ -106,3 +106,18 @@ server/coverage/
 # Claude/local agent settings (may contain API keys)
 .claude/
 server/.claude/
+
+# ── Docker bind-mount data directories ──────────────────────────
+postgres-data/
+server-data/
+client-data/
+
+# ── Map service runtime files ───────────────────────────────────
+.cache_pin_maps/
+public_map/venv/
+public_map/__pycache__/
+__pycache__/
+*.pyc
+
+# ── PM2 process files ───────────────────────────────────────────
+ecosystem.config.js

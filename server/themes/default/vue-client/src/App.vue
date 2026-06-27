@@ -1,7 +1,7 @@
 <template>
   <nav class="navbar navbar-expand-lg fixed-top">
     <div class="container-fluid">
-      <a class="navbar-brand fw-bold" href="/">{{ monitorName }}</a>
+          <router-link class="navbar-brand fw-bold" to="/">{{ monitorName }}</router-link>
       <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav" aria-controls="mainNav" aria-expanded="false" aria-label="Toggle navigation">
         <span class="navbar-toggler-icon" style="filter: invert(1);"></span>
       </button>
@@ -24,12 +24,17 @@
             <ul class="dropdown-menu dropdown-menu-dark">
               <li><router-link class="dropdown-item" to="/admin/aliases"><i class="bi bi-card-list me-2"></i>Aliases</router-link></li>
               <li><router-link class="dropdown-item" to="/admin/users"><i class="bi bi-people-fill me-2"></i>Users</router-link></li>
+              <li><router-link class="dropdown-item" to="/admin/incident-types"><i class="bi bi-palette-fill me-2"></i>Call Types</router-link></li>
+              <li><router-link class="dropdown-item" to="/admin/geo-config"><i class="bi bi-geo-alt-fill me-2"></i>Location Config</router-link></li>
               <li><hr class="dropdown-divider"></li>
               <li><router-link class="dropdown-item" to="/admin/settings"><i class="bi bi-gear-fill me-2"></i>Settings</router-link></li>
             </ul>
           </li>
         </ul>
         <ul class="navbar-nav ms-auto mb-2 mb-lg-0 align-items-center">
+          <li v-if="tz" class="nav-item me-3">
+            <span class="text-muted" style="font-size:0.72rem">{{ tz }}</span>
+          </li>
           <li class="nav-item me-2">
             <button class="btn btn-sm btn-outline-secondary" @click="toggleDark" :title="dark ? 'Light mode' : 'Dark mode'">
               <i :class="dark ? 'bi bi-sun-fill' : 'bi bi-moon-fill'"></i>
@@ -125,5 +130,16 @@ onMounted(async () => {
       registrationEnabled.value = !!d.registration
     }
   } catch (_) {}
+
+  // Keyboard shortcut: / focuses search on MessagesView
+  document.addEventListener('keydown', function(e) {
+    if (e.key === '/' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+      e.preventDefault()
+      var el = document.querySelector('input[placeholder*="Search"], input[placeholder*="Filter"]')
+      if (el) el.focus()
+    }
+  })
 })
+
+const tz = new Intl.DateTimeFormat('en', { timeZoneName: 'short' }).formatToParts(new Date()).find(p => p.type === 'timeZoneName')?.value || ''
 </script>

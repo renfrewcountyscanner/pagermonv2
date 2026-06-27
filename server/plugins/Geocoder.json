@@ -1,0 +1,82 @@
+{
+  "name": "Geocoder",
+  "description": "Parses pager messages for addresses, geocodes them via Nominatim, stores results, and pushes to the public map service.",
+  "disable": false,
+  "trigger": "message",
+  "scope": "before",
+  "config": [
+    {
+      "name": "nominatimSource",
+      "label": "Nominatim Source",
+      "description": "Choose public Nominatim or a private/self-hosted instance",
+      "type": "select",
+      "options": [
+        {"value": "public", "text": "Public (nominatim.openstreetmap.org)"},
+        {"value": "custom", "text": "Custom / Private Instance"}
+      ],
+      "required": true
+    },
+    {
+      "name": "nominatimUrl",
+      "label": "Nominatim URL",
+      "description": "Nominatim API endpoint. Pre-filled for public; enter your private instance URL here.",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "rateLimitMs",
+      "label": "Rate Limit (ms)",
+      "description": "Minimum delay between Nominatim requests (recommended: 1100ms = 1 request/sec per Nominatim ToS)",
+      "type": "number",
+      "required": true
+    },
+    {
+      "name": "userAgent",
+      "label": "User Agent",
+      "description": "User-Agent header for Nominatim requests (required by OSM Nominatim usage policy)",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "mapPushUrl",
+      "label": "Map Push URL",
+      "description": "URL of the public map push endpoint (e.g., http://127.0.0.1:5000/api/push-call)",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "mapApiKey",
+      "label": "Map API Key",
+      "description": "Shared secret for push authentication (must match PUBLIC_MAP_API_KEY in the map service's .env)",
+      "type": "text",
+      "required": true
+    },
+    {
+      "name": "bulkMode",
+      "label": "Bulk Mode",
+      "description": "When enabled, limits to 4 requests/min (Nominatim bulk policy). Turn off for real-time 1 req/sec interactive mode.",
+      "type": "checkbox"
+    },
+    {
+      "name": "dedupEnable",
+      "label": "Enable Deduplication",
+      "description": "Skip map inserts for duplicate addresses + messages within the configured window",
+      "type": "checkbox"
+    },
+    {
+      "name": "dedupWindowMinutes",
+      "label": "Dedup Window (minutes)",
+      "description": "Time window for deduplication. Same address + message within this window is skipped. Default: 15 minutes.",
+      "type": "number",
+      "required": false
+    }
+  ],
+  "aliasConfig": [
+    {
+      "name": "enable",
+      "label": "Enable Geocoding",
+      "description": "Enable geocoding for messages matching this alias",
+      "type": "checkbox"
+    }
+  ]
+}

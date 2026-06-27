@@ -1,4 +1,4 @@
-var version = "0.3.13-beta";
+var version = "0.3.14-beta";
 
 var debug = require('debug')('pagermon:server');
 var io = require('@pm2/io').init({
@@ -20,7 +20,7 @@ var cookieParser = require('cookie-parser');
 var bodyParser = require('body-parser');
 var fs = require('fs');
 var session = require('express-session');
-var SQLiteStore = require('connect-sqlite3')(session);
+var pgSession = require('connect-pg-simple')(session);
 var cors = require('cors');
 var rateLimit = require('express-rate-limit');
 var flash    = require('connect-flash');
@@ -57,15 +57,6 @@ if (!theme) {
   var theme = nconf.get('global:theme')
 }
 
-var dbtype = nconf.get('database:type');
-// Set the database port if none found, for backwards compatibility
-if (dbtype == 'pg' || dbtype == 'mysql' || dbtype == 'mssql') {
-	if (!nconf.get('database:port')){
-		nconf.set('database:port', 3306);
-		nconf.save();
-	}
-}
-
 //Enable Azure Monitoring if enabled
 var azureEnable = nconf.get('monitoring:azureEnable')
 var azureKey = nconf.get('monitoring:azureKey')
@@ -83,8 +74,6 @@ if (azureEnable) {
              .start();
 }
 
-checkForDbDriver(nconf.get('database:type'));
-
 var dbinit = require('./db');
     dbinit.init();
 var db = require('./knex/knex.js');
@@ -96,6 +85,13 @@ var index = require('./routes/index');
 var admin = require('./routes/admin');
 var api = require('./routes/api');
 var auth = require('./routes/auth');
+
+// Validate critical security settings before starting
+var sessionSecret = nconf.get('global:sessionSecret');
+if (!sessionSecret || sessionSecret === 'REPLACE_ME_ON_FIRST_RUN') {
+  logger.main.error('FATAL: global.sessionSecret is not set. Run the server once to auto-generate it, or set it manually in config.json.');
+  process.exit(1);
+}
 
 var port = normalizePort(process.env.PORT || '3000');
 var app = express();
@@ -192,12 +188,22 @@ app.use(cookieParser());
 
 var sessSet = {
     cookie: {
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 1 week
+        maxAge: 7 * 24 * 60 * 60 * 1000,
         httpOnly: true,
         secure: nconf.get('global:secureCookie') || process.env.SECURE_COOKIE === 'true' || false,
         sameSite: 'lax'
     },
-    store: new SQLiteStore,
+    store: new pgSession({
+      pool: new (require('pg').Pool)({
+        host: process.env.DATABASE__SERVER || nconf.get('database:server') || 'postgres',
+        port: process.env.DATABASE__PORT || nconf.get('database:port') || 5432,
+        database: process.env.DATABASE__DATABASE || nconf.get('database:database') || 'pagermon',
+        user: process.env.DATABASE__USERNAME || nconf.get('database:username') || 'pagermon',
+        password: process.env.DATABASE__PASSWORD || nconf.get('database:password') || '',
+        max: 5,
+      }),
+      createTableIfMissing: true
+    }),
     saveUninitialized: true,
     resave: true,
     secret: secret,
@@ -260,48 +266,6 @@ app.use(function(err, req, res, next) {
   res.render(path.join(__dirname,'themes',theme, 'views', 'global', 'error'), { title: title });
 });
 
-// Add cronjob to automatically refresh aliases
-var dbtype = nconf.get('database:type')
-if (dbtype == 'mysql') {
-  const cronvalidate = require('cron-validator');
-  // Get CRON from config
-  var cronartime = nconf.get('database:aliasRefreshInterval');
-  //If value is falsy (undefined, empty, null etc), set as default
-  if (!cronartime){cronartime = "0 5,35 * * * *";}
-  //Check value isn't garbage, if it is set to default
-  if (!cronvalidate.isValidCron(cronartime,{ seconds: true })) {
-    logger.main.warn('CRON: Invalid CRON configuration in config file. Defaulting to: "0 5,35 * * * *" ')
-    cronartime = "0 5,35 * * * *";
-  } 
-  var aliasRefreshJob = require('cron').CronJob;
-  new aliasRefreshJob(cronartime, function() {
-    var refreshRequired = nconf.get('database:aliasRefreshRequired')
-    logger.main.debug('CRON: Running Cronjob AliasRefresh')
-    if (refreshRequired == 1) {
-      console.time('updateMap');
-      logger.main.info('CRON: Alias Refresh required, running.')
-      db('messages').update('alias_id', function() {
-        this.select('id')
-            .from('capcodes')
-            .where(db.ref('messages.address'), 'like', db.ref('capcodes.address') )
-            .orderByRaw("REPLACE(address, '_', '%') DESC LIMIT 1")
-      })
-      .then((result) => {
-          console.timeEnd('updateMap');
-          nconf.set('database:aliasRefreshRequired', 0);
-          nconf.save();
-          logger.main.info('CRON: Alias Refresh Successful')
-      })
-      .catch((err) => {
-        logger.main.error('CRON: Error refreshing aliases' + err); 
-        console.timeEnd('updateMap'); 
-      })
-    } else {
-      logger.main.debug('CRON: Alias Refresh not Required, Skipping.')
-    }
-  }, null, true);
-}
-
 //Disable all logging for tests
 if(process.env.NODE_ENV === 'test') { 
   logger.main.silent = true
@@ -350,53 +314,6 @@ function onError(error) {
     default:
       throw error;
   }
-}
-
-function checkForDbDriver(driver) {
-  switch (driver) {
-    /* eslint-disable import/no-extraneous-dependencies, global-require */
-    case 'sqlite3': {
-      try {
-        require('sqlite3');
-      } catch (e) {
-        logger.main.error(`Selected database type is sqlite3, but npm package sqlite3 was not installed.`);
-        logger.main.error(
-          `Please run npm i sqlite3 to install or refer to https://www.npmjs.com/package/sqlite3 for reference`
-        );
-        process.exit(1);
-      }
-      break;
-    }
-    case 'mysql': {
-      try {
-        require('knex');
-      } catch (e) {
-        logger.main.error(`Selected database type is mysql, but npm package knex was not installed.`);
-        logger.main.error(
-          `Please run npm i knex to install or refer to https://www.npmjs.com/package/knex for reference`
-        );
-        process.exit(1);
-      }
-      break;
-    }
-    case 'oracledb': {
-      try {
-        require('oracledb');
-      } catch (e) {
-        logger.main.error(`Selected database type is oracledb, but npm package oracledb was not installed.`);
-        logger.main.error(
-          `Please run npm i oracledb to install or refer to https://www.npmjs.com/package/oracledb for reference`
-        );
-        process.exit(1);
-      }
-      break;
-    }
-    default: {
-      logger.main.error(`No database type was specified.`);
-      process.exit(1);
-    }
-  }
-  /* eslint-enable import/no-extraneous-dependencies, global-require */
 }
 
 

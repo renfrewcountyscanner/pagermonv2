@@ -28,6 +28,29 @@
                 <option v-for="l in ['debug','info','warn','error']" :key="l" :value="l">{{ l }}</option>
               </select>
             </div>
+            <div class="col-md-3">
+              <label class="form-label">Timezone</label>
+              <select v-model="config.global.timezone" class="form-select">
+                <option value="America/Toronto">Eastern (ET)</option>
+                <option value="America/Chicago">Central (CT)</option>
+                <option value="America/Denver">Mountain (MT)</option>
+                <option value="America/Los_Angeles">Pacific (PT)</option>
+                <option value="America/Anchorage">Alaska (AK)</option>
+                <option value="Pacific/Honolulu">Hawaii (HT)</option>
+                <option value="America/St_Johns">Newfoundland (NT)</option>
+                <option value="America/Halifax">Atlantic (AT)</option>
+                <option value="America/Winnipeg">Central (CT)</option>
+                <option value="America/Regina">Saskatchewan (CT)</option>
+                <option value="America/Edmonton">Mountain (MT)</option>
+                <option value="America/Vancouver">Pacific (PT)</option>
+                <option value="America/Phoenix">Mountain (Arizona)</option>
+                <option value="UTC">UTC</option>
+                <option value="Europe/London">UK / Ireland</option>
+                <option value="Europe/Paris">Central Europe</option>
+                <option value="Australia/Sydney">Eastern Australia</option>
+                <option value="Pacific/Auckland">New Zealand</option>
+              </select>
+            </div>
             <div class="col-md-6">
               <label class="form-label">Search Location</label>
               <select v-model="config.global.searchLocation" class="form-select">
@@ -124,6 +147,25 @@
         </div>
       </div>
 
+      <!-- Public Map -->
+      <div class="card shadow-sm mb-3">
+        <div class="card-header fw-semibold small">Public Map</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Map Base URL</label>
+              <input v-model="config.publicmap.baseurl" type="text" class="form-control" placeholder="http://localhost:5000" />
+              <div class="form-text">Public URL of the live map service. Used for Discord/n8n map image links.</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Map API Key</label>
+              <input v-model="config.publicmap.apikey" type="text" class="form-control" placeholder="Map push API key" />
+              <div class="form-text">Must match PUBLIC_MAP_API_KEY in the mapping service .env file.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- Auth -->
       <div class="card shadow-sm mb-3">
         <div class="card-header fw-semibold small">Auth</div>
@@ -178,20 +220,27 @@
       </div>
 
       <!-- Plugins -->
-      <div v-for="plugin in plugins" :key="plugin.name" class="card shadow-sm mb-3">
-        <div class="card-header d-flex align-items-center gap-2">
+      <div class="d-flex align-items-center gap-2 mb-3">
+        <span class="fw-bold small">Plugins</span>
+        <input v-model="pluginFilter" type="text" class="form-control form-control-sm ms-auto" style="max-width:220px;" placeholder="Filter plugins…" />
+      </div>
+      <div v-for="plugin in filteredPlugins" :key="plugin.name" class="card shadow-sm mb-2">
+        <div class="card-header d-flex align-items-center gap-2" style="cursor:pointer;padding:8px 14px;"
+             @click="toggleCollapse(plugin.name)">
+          <i class="bi" :class="collapsed[plugin.name] !== false ? 'bi-chevron-right' : 'bi-chevron-down'"
+             style="font-size:0.7rem;width:14px;flex-shrink:0;"></i>
           <span class="fw-semibold small flex-grow-1">{{ plugin.name }}</span>
-          <span class="text-muted small">{{ plugin.description }}</span>
-          <div class="form-check form-switch mb-0 ms-3">
+          <span v-if="collapsed[plugin.name] !== false && pluginConfig(plugin.name).enable"
+                class="text-muted" style="font-size:0.7rem;">{{ fieldCount(plugin) }} fields</span>
+          <div class="form-check form-switch mb-0" @click.stop>
             <input class="form-check-input" type="checkbox" role="switch"
               :id="`plugin-enable-${plugin.name}`"
               v-model="pluginConfig(plugin.name).enable" />
-            <label class="form-check-label" :for="`plugin-enable-${plugin.name}`">Enable</label>
           </div>
         </div>
-        <div class="card-body" v-if="pluginConfig(plugin.name).enable && plugin.config && plugin.config.length">
-          <div v-for="field in plugin.config" :key="field.name" class="mb-3">
-            <label class="form-label small fw-semibold">{{ field.label }}</label>
+        <div class="card-body" v-show="collapsed[plugin.name] === false && plugin.config && plugin.config.length" style="padding:12px 14px;">
+          <div v-for="field in plugin.config" :key="field.name" class="mb-2">
+            <label class="form-label small fw-semibold mb-1">{{ field.label }}</label>
             <input v-if="field.type === 'text'" v-model="pluginConfig(plugin.name)[field.name]"
               type="text" class="form-control form-control-sm" :placeholder="field.description || ''" />
             <input v-else-if="field.type === 'number'" v-model.number="pluginConfig(plugin.name)[field.name]"
@@ -201,7 +250,8 @@
             <div v-else-if="field.type === 'checkbox'" class="form-check">
               <input v-model="pluginConfig(plugin.name)[field.name]" type="checkbox"
                 class="form-check-input" :id="`${plugin.name}-${field.name}`" />
-              <label class="form-check-label small text-muted" :for="`${plugin.name}-${field.name}`">{{ field.description }}</label>
+              <label class="form-check-label" :for="`${plugin.name}-${field.name}`">{{ field.label }}</label>
+              <div v-if="field.description" class="form-text">{{ field.description }}</div>
             </div>
             <select v-else-if="field.type === 'select'" v-model="pluginConfig(plugin.name)[field.name]"
               class="form-select form-select-sm">
@@ -214,7 +264,9 @@
 
       <div class="d-flex gap-2 mt-3">
         <button class="btn btn-primary" :disabled="busy" @click="saveSettings">
-          <span v-if="busy" class="spinner-border spinner-border-sm me-2"></span>Save Settings
+          <template v-if="busy"><span class="spinner-border spinner-border-sm me-2"></span>Saving…</template>
+          <template v-else-if="justSaved"><i class="bi bi-check-lg me-1"></i>Saved</template>
+          <template v-else>Save Settings</template>
         </button>
       </div>
     </template>
@@ -228,37 +280,58 @@ const addToast = inject('toast', () => {})
 const loading = ref(true)
 const busy = ref(false)
 const saved = ref(false)
+const justSaved = ref(false)
 const error = ref('')
-const config = ref(null)
 const plugins = ref([])
 const themes = ref([])
+const collapsed = ref({})
+const pluginFilter = ref('')
 
-const dedup = computed({
-  get() {
-    if (!config.value) return { enable: false, windowMinutes: 15 }
-    return config.value.messages?.deduplication || { enable: false, windowMinutes: 15 }
-  },
-  set(v) {
-    if (!config.value.messages) config.value.messages = {}
-    config.value.messages.deduplication = v
-  }
+const filteredPlugins = computed(() => {
+  var f = pluginFilter.value.toLowerCase()
+  if (!f) return plugins.value
+  return plugins.value.filter(p => p.name.toLowerCase().includes(f) || (p.description || '').toLowerCase().includes(f))
+})
+
+function toggleCollapse(name) {
+  collapsed.value[name] = collapsed.value[name] === false ? true : false
+}
+
+function fieldCount(plugin) {
+  if (!plugin.config) return 0
+  return plugin.config.length
+}
+
+const config = reactive({
+  global: {}, messages: {}, auth: {}, publicmap: {}, plugins: {},
 })
 
 const apiKeys = computed({
   get() {
-    if (!config.value) return []
-    return config.value.auth?.keys || []
+    if (!config) return []
+    return config.auth?.keys || []
   },
   set(v) {
-    if (!config.value.auth) config.value.auth = {}
-    config.value.auth.keys = v
+    if (!config.auth) config.auth = {}
+    config.auth.keys = v
+  }
+})
+
+const dedup = computed({
+  get() {
+    if (!config || !config.messages) return { enable: false, windowMinutes: 15 }
+    return config.messages.deduplication || { enable: false, windowMinutes: 15 }
+  },
+  set(v) {
+    if (!config.messages) config.messages = {}
+    config.messages.deduplication = { enable: !!v, windowMinutes: dedup.value.windowMinutes }
   }
 })
 
 function pluginConfig(name) {
-  if (!config.value.plugins) config.value.plugins = {}
-  if (!config.value.plugins[name]) config.value.plugins[name] = { enable: false }
-  return config.value.plugins[name]
+  if (!config.plugins) config.plugins = {}
+  if (!config.plugins[name]) config.plugins[name] = { enable: false }
+  return config.plugins[name]
 }
 
 function generateApiKey(index) {
@@ -293,18 +366,20 @@ onMounted(async () => {
     const r = await fetch('/admin/settingsData')
     if (r.ok) {
       const d = await r.json()
-      config.value = d.settings
+      Object.assign(config, d.settings)
       plugins.value = d.plugins || []
       themes.value = d.themes || []
 
       // Initialize defaults to avoid state mutation during render
-      if (!config.value.messages) config.value.messages = {}
-      if (!config.value.messages.deduplication) config.value.messages.deduplication = { enable: false, windowMinutes: 15 }
-      if (!config.value.auth) config.value.auth = {}
-      if (!Array.isArray(config.value.auth.keys)) config.value.auth.keys = []
-      if (!config.value.plugins) config.value.plugins = {}
+      if (!config.messages) config.messages = {}
+      if (!config.messages.deduplication) config.messages.deduplication = { enable: false, windowMinutes: 15 }
+      if (!config.auth) config.auth = {}
+      if (!Array.isArray(config.auth.keys)) config.auth.keys = []
+      if (!config.plugins) config.plugins = {}
+      if (!config.publicmap) config.publicmap = { baseurl: '', apikey: '' }
+      if (!config.global) config.global = {}
       plugins.value.forEach(p => {
-        if (!config.value.plugins[p.name]) config.value.plugins[p.name] = { enable: false }
+        if (!config.plugins[p.name]) config.plugins[p.name] = { enable: false }
       })
     }
   } catch (e) {
@@ -314,22 +389,18 @@ onMounted(async () => {
 })
 
 async function saveSettings() {
-  busy.value = true; saved.value = false; error.value = ''
-  try {
-    const r = await fetch('/admin/settingsData', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(config.value),
-    })
-    if (r.ok) {
-      saved.value = true
-      addToast('Settings saved')
-    } else {
-      error.value = 'Save failed'
-      addToast('Save failed', 'danger')
-    }
-  } catch (e) {
-    error.value = e.message
+  busy.value = true
+  var r = await fetch('/admin/settingsData', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(config),
+  })
+  if (r.ok) {
+    justSaved.value = true
+    setTimeout(function () { justSaved.value = false }, 2000)
+    addToast('Settings saved')
+  } else {
+    addToast('Save failed', 'danger')
   }
   busy.value = false
 }

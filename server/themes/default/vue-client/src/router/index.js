@@ -2,7 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth.js'
 
 const routes = [
-  { path: '/', component: () => import('../views/MessagesView.vue') },
+  { path: '/', component: () => import('../views/MessagesView.vue'), meta: { requiresAuth: true } },
   { path: '/livelog', component: () => import('../views/LiveLogView.vue'), meta: { requiresAuth: true } },
   { path: '/auth/login', component: () => import('../views/auth/LoginView.vue') },
   { path: '/auth/register', component: () => import('../views/auth/RegisterView.vue') },
@@ -14,6 +14,10 @@ const routes = [
   { path: '/admin/users', component: () => import('../views/admin/UsersView.vue'), meta: { requiresAdmin: true } },
   { path: '/admin/users/:id', component: () => import('../views/admin/UserDetailView.vue'), meta: { requiresAdmin: true } },
   { path: '/admin/settings', component: () => import('../views/admin/SettingsView.vue'), meta: { requiresAdmin: true } },
+  { path: '/admin/incident-types', component: () => import('../views/admin/IncidentTypesView.vue'), meta: { requiresAdmin: true } },
+  { path: '/admin/incident-types/:id', component: () => import('../views/admin/IncidentTypeDetailView.vue'), meta: { requiresAdmin: true } },
+  { path: '/admin/geo-config', component: () => import('../views/admin/GeoConfigView.vue'), meta: { requiresAdmin: true } },
+  { path: '/admin/geo-config/:id', component: () => import('../views/admin/GeoConfigDetailView.vue'), meta: { requiresAdmin: true } },
   { path: '/:pathMatch(.*)*', redirect: '/' },
 ]
 

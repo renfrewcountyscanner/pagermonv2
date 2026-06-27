@@ -5,7 +5,6 @@
       <h5 class="fw-bold mb-0">{{ isNew ? 'New User' : 'Edit User' }}</h5>
     </div>
 
-    <div v-if="saved" class="alert alert-success py-2">Saved.</div>
     <div v-if="error" class="alert alert-danger py-2">{{ error }}</div>
 
     <div class="card shadow-sm">
@@ -49,7 +48,9 @@
           </div>
           <div class="d-flex gap-2">
             <button type="submit" class="btn btn-primary" :disabled="busy">
-              <span v-if="busy" class="spinner-border spinner-border-sm me-2"></span>Save
+              <template v-if="busy"><span class="spinner-border spinner-border-sm me-2"></span>Saving…</template>
+              <template v-else-if="justSaved"><i class="bi bi-check-lg me-1"></i>Saved</template>
+              <template v-else>Save</template>
             </button>
             <router-link to="/admin/users" class="btn btn-outline-secondary">Cancel</router-link>
           </div>
@@ -70,19 +71,18 @@ const addToast = inject('toast', () => {})
 const id = route.params.id
 const isNew = id === 'new'
 const busy = ref(false)
-const saved = ref(false)
+const justSaved = ref(false)
 const error = ref('')
 const form = reactive({ givenname: '', surname: '', username: '', email: '', role: 'user', status: 'active', password: '' })
 
 onMounted(async () => {
   if (!isNew) {
-    const r = await fetch(`/api/user/${id}`)
-    if (r.ok) Object.assign(form, await r.json())
+    try { const r = await fetch('/api/user/' + id); if (r.ok) Object.assign(form, await r.json()) } catch (_) {}
   }
 })
 
 async function save() {
-  busy.value = true; saved.value = false; error.value = ''
+  busy.value = true; justSaved.value = false; error.value = ''
   const url = isNew ? '/api/user' : `/api/user/${id}`
   const payload = { ...form }
   if (!isNew) delete payload.password
@@ -92,7 +92,8 @@ async function save() {
     body: JSON.stringify(payload),
   })
   if (r.ok) {
-    saved.value = true
+    justSaved.value = true
+    setTimeout(function() { justSaved.value = false }, 2000)
     addToast('User saved')
     if (isNew) router.push('/admin/users')
   } else {

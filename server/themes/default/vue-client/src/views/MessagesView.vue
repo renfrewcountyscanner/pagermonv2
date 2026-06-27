@@ -101,12 +101,12 @@
         </thead>
         <tbody>
           <tr v-if="loading && messages.length === 0">
-            <td colspan="6" class="text-center py-5 text-muted">
+              <td colspan="6" class="text-center py-5 text-muted">
               <i class="bi bi-arrow-clockwise spin me-2"></i>Loading…
             </td>
           </tr>
           <tr v-else-if="!loading && messages.length === 0">
-            <td colspan="6" class="text-center py-5 text-muted">
+              <td colspan="6" class="text-center py-5 text-muted">
               <div class="mb-2"><i class="bi bi-inbox" style="font-size:2rem;"></i></div>
               No messages found.<br />
               <span class="small">Pages will appear here when received.</span>
@@ -132,7 +132,10 @@
               <i v-if="msg.icon" :class="`bi bi-${msg.icon} me-1`" :style="{ color: msg.color }"></i>
               {{ msg.alias }}
             </td>
-            <td class="msg-text" v-html="highlight(msg.message)"></td>
+            <td class="msg-text">
+              <span v-if="isTestMessage(msg)" class="badge bg-warning text-dark me-1" style="font-size:0.65rem;">TEST RETRIGGER</span>
+              <span v-html="highlight(cleanMessage(msg.message))"></span>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -190,7 +193,8 @@
           <dd v-if="selected.alias" class="col-8">{{ selected.alias }}</dd>
         </dl>
         <div class="p-2 rounded mb-2" style="background:var(--pm-surface-alt); word-break:break-word; white-space:pre-wrap;">
-          {{ selected.message }}
+          <span v-if="isTestMessage(selected)" class="badge bg-warning text-dark me-2" style="font-size:0.65rem;">TEST RETRIGGER</span>
+          {{ cleanMessage(selected.message) }}
         </div>
         <div class="d-flex flex-wrap gap-2 mb-3">
           <button class="btn btn-sm btn-outline-secondary" @click="copyMessage(selected)" title="Copy message to clipboard">
@@ -198,6 +202,10 @@
           </button>
           <button class="btn btn-sm btn-outline-secondary" @click="copyCapcode(selected)" title="Copy capcode to clipboard">
             <i class="bi bi-hash me-1"></i>Copy Capcode
+          </button>
+          <button class="btn btn-sm btn-outline-warning" @click="retriggerMessage(selected)" title="Re-process through notification pipeline">
+            <i :class="retriggering === selected.id ? 'bi bi-arrow-repeat spin me-1' : 'bi bi-lightning-charge-fill me-1'"></i>
+            {{ retriggering === selected.id ? 'Retriggering…' : 'Retrigger Notifications' }}
           </button>
         </div>
         <div class="d-flex gap-2">
@@ -221,6 +229,7 @@ import { useSocket } from '../composables/useSocket.js'
 const route = useRoute()
 const router = useRouter()
 const addToast = inject('toast', () => {})
+const retriggering = ref(null)
 
 const messages    = ref([])
 const loading     = ref(false)
@@ -458,6 +467,28 @@ function clearActiveFilter() {
 function goPage(p) {
   currentPage.value = Math.max(0, Math.min(p, pageCount.value - 1))
   loadMessages()
+}
+
+async function retriggerMessage(msg) {
+  retriggering.value = msg.id
+  try {
+    const r = await fetch(`/api/messages/${msg.id}/retrigger`, { method: 'POST' })
+    if (r.ok) {
+      addToast('Notifications retriggered — new message ID ' + await r.text())
+    } else {
+      addToast('Retrigger failed', 'danger')
+    }
+  } catch (_) { addToast('Retrigger failed', 'danger') }
+  retriggering.value = null
+}
+
+function isTestMessage(msg) {
+  return msg && msg.message && msg.message.startsWith('[TEST RETRIGGER]')
+}
+
+function cleanMessage(text) {
+  if (text && text.startsWith('[TEST RETRIGGER] ')) return text.slice(18)
+  return text
 }
 
 function selectMessage(msg) { selected.value = msg }

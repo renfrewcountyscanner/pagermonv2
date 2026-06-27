@@ -55,7 +55,6 @@ router.get('/livelog', function (req, res) {
     serveVueApp(req, res);
 });
 
-/* Serve Vue app for all other page-level routes */
 router.get('/favicon.ico', function (req, res) { res.status(204).end(); });
 
 module.exports = router;

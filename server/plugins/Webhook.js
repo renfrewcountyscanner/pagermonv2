@@ -60,6 +60,13 @@ function run(trigger, scope, data, config, callback) {
     targetURL = pConf.webhookURL;
   }
 
+  // ── Retrigger: prefix message with test indicator ──
+  if (data.pluginData && data.pluginData.retrigger) {
+    data = Object.assign({}, data);
+    data.message = '[TEST RETRIGGER] ' + (data.message || '');
+    if (data.pluginData) data.pluginData = Object.assign({}, data.pluginData);
+  }
+
   const payload = buildPayload(data, config);
   const headers = buildHeaders(config);
 

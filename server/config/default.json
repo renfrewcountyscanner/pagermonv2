@@ -9,12 +9,18 @@
     "theme": "default",
     "monitorName": "PagerMon",
     "faKey": "changeme",
+    "mapLat": 45.42,
+    "mapLng": -75.70,
+    "timezone": "America/Toronto",
     "secureCookie": false
   },
   "database": {
-    "file": "./messages.db",
-    "type": "sqlite3",
-    "aliasRefreshInterval": "0 5,35 * * * *"
+    "type": "pg",
+    "server": "postgres",
+    "port": 5432,
+    "database": "pagermon",
+    "username": "pagermon",
+    "password": ""
   },
   "messages": {
     "maxLimit": 120,
@@ -129,6 +135,22 @@
     },
     "Template": {
       "enable": false
+    },
+    "Geocoder": {
+      "enable": false,
+      "nominatimSource": "public",
+      "nominatimUrl": "https://nominatim.openstreetmap.org/search",
+      "rateLimitMs": 1100,
+      "userAgent": "PagerMon/1.0",
+      "mapPushUrl": "http://127.0.0.1:5000/api/push-call",
+      "mapApiKey": "REPLACE_WITH_MAP_API_KEY",
+      "bulkMode": false,
+      "dedupEnable": true,
+      "dedupWindowMinutes": 15
     }
+  },
+  "publicmap": {
+    "baseurl": "http://127.0.0.1:5000",
+    "apikey": "REPLACE_WITH_MAP_API_KEY"
   }
 }

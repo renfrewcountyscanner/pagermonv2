@@ -21,8 +21,8 @@ FROM node:18-alpine AS server-builder
 
 WORKDIR /app
 
-# sqlite3 needs Python + build tools for native bindings
-RUN apk add --no-cache python3 make g++ sqlite
+# pg needs build tools for native bindings
+RUN apk add --no-cache python3 make g++
 
 COPY package*.json ./
 RUN npm ci --production
@@ -36,7 +36,7 @@ LABEL org.opencontainers.image.title="PagerMon Server" \
       org.opencontainers.image.description="API-driven pager message server" \
       org.opencontainers.image.source="https://github.com/renfrewcountyscanner/pagermonv2"
 
-RUN apk add --no-cache sqlite curl
+RUN apk add --no-cache curl
 
 WORKDIR /app
 
@@ -50,7 +50,7 @@ COPY --from=server-builder /app/node_modules ./node_modules
 COPY . ./
 
 # Prepare config directory
-RUN mkdir -p /config && \
+RUN mkdir -p /config /defaults && \
     cp /app/config/default.json /defaults/config.json && \
     ln -sf /config/config.json /app/config/config.json && \
     ln -sf /config/backup.json /app/config/backup.json
@@ -63,4 +63,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 ENV NODE_ENV=production \
     APP_NAME=PagerMon
 
-CMD ["node", "app.js"]
+ENTRYPOINT ["/bin/sh", "/app/docker-entrypoint.sh"]

@@ -1,53 +1,16 @@
+# Docker image builds disabled.
+# To re-enable, change 'workflow_dispatch' to 'push' trigger.
+
 name: Publish Docker image
 
 on:
-  push:
-    branches:
-      - 'develop'
-    tags:
-      - 'v*.*.*'
+  workflow_dispatch:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
-  build_images:
-    name: Build Docker images
+  noop:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out the repo
-        uses: actions/checkout@v4
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Docker meta
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: renfrewcountyscanner/pagermonv2
-
-      - name: Build server image
-        uses: docker/build-push-action@v5
-        with:
-          file: server/Dockerfile
-          context: ./server
-          platforms: linux/amd64,linux/arm64
-          push: false
-          tags: ${{ steps.meta.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Build client image
-        uses: docker/build-push-action@v5
-        with:
-          file: client/Dockerfile
-          context: ./client
-          platforms: linux/amd64,linux/arm64
-          push: false
-          tags: ${{ steps.meta.outputs.tags }}-client
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+      - run: echo "Docker image publishing is currently disabled."
