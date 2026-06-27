@@ -29,7 +29,7 @@ router.use(bodyParser.urlencoded({     // to support URL-encoded bodies
 }));
 
 // Fields that must never be overwritten via the settings API
-const PROTECTED_FIELDS = ['encPass', 'sessionSecret', 'keys'];
+const PROTECTED_FIELDS = ['encPass', 'sessionSecret'];
 
 function sanitizeSettings(settings) {
     // Return a shallow copy without sensitive fields
@@ -37,7 +37,11 @@ function sanitizeSettings(settings) {
     if (safe.auth) {
         safe.auth = { ...safe.auth };
         delete safe.auth.encPass;
-        delete safe.auth.keys;
+        if (Array.isArray(safe.auth.keys)) {
+            safe.auth.keys = safe.auth.keys.map(k => ({
+                name: k.name || '', key: '', selected: k.selected || false
+            }));
+        }
     }
     if (safe.global) {
         safe.global = { ...safe.global };
@@ -54,6 +58,16 @@ function mergeSettings(current, incoming) {
         if (!merged[section]) merged[section] = {};
         if (typeof incoming[section] === 'object' && !Array.isArray(incoming[section])) {
             for (let key in incoming[section]) {
+                if (section === 'auth' && key === 'keys' && Array.isArray(incoming.auth.keys)) {
+                    const curKeys = Array.isArray(merged.auth.keys) ? merged.auth.keys : [];
+                    merged.auth.keys = incoming.auth.keys.map(ink => {
+                        if (ink.key) return { ...ink };
+                        const match = curKeys.find(ck => ck.name === ink.name);
+                        if (match) return { ...ink, key: match.key, selected: match.selected };
+                        return null;
+                    }).filter(Boolean);
+                    continue;
+                }
                 if (section === 'auth' && PROTECTED_FIELDS.includes(key)) {
                     continue; // skip protected auth fields
                 }
