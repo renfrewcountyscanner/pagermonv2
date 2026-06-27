@@ -25,7 +25,7 @@ WORKDIR /app
 RUN apk add --no-cache python3 make g++
 
 COPY package*.json ./
-RUN npm ci --production
+RUN npm install --production
 
 # ───────────────────────────────────────────
 # Stage 3: Runtime image
