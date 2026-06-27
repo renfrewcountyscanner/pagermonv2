@@ -11,10 +11,10 @@ set -e
 # migrations automatically on first boot.
 # =============================================================================
 
-RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
-log()  { echo -e "${GREEN}[+]${NC} $1"; }
-warn() { echo -e "${YELLOW}[!]${NC} $1"; }
-die()  { echo -e "${RED}[X]${NC} $1"; exit 1; }
+RED=$'\033[0;31m'; GREEN=$'\033[0;32m'; YELLOW=$'\033[1;33m'; NC=$'\033[0m'
+log()  { printf "%b\n" "${GREEN}[+]${NC} $1"; }
+warn() { printf "%b\n" "${YELLOW}[!]${NC} $1"; }
+die()  { printf "%b\n" "${RED}[X]${NC} $1"; exit 1; }
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 cd "$SCRIPT_DIR"
@@ -112,8 +112,8 @@ done
 
 # ── 6. Done ─────────────────────────────────────────────────────
 echo ""
-echo -e "${GREEN}══════════════════════════════════════════════${NC}"
-echo -e "${GREEN}  PagerMon is running!${NC}"
+printf "%b\n" "${GREEN}══════════════════════════════════════════════${NC}"
+printf "%b\n" "${GREEN}  PagerMon is running!${NC}"
 echo ""
 echo "  PagerMon:    http://localhost:${SERVER_PORT:-3000}"
 echo "  Live Map:    http://localhost:${MAP_PORT:-5000}"
@@ -121,13 +121,13 @@ echo "  Default login: admin / changeme"
 echo ""
 echo "  Enable Geocoder: visit Admin → Settings → Plugins → Geocoder → Enable"
 echo ""
-  echo "  ${YELLOW}First-time setup:${NC}"
-  echo "    1. Log in and change the admin password"
-  echo "    2. Admin → Location Config → add your dispatch areas"
-  echo "    3. Admin → Settings → Plugins → Geocoder → Enable"
-  echo "    4. Admin → Call Types → Scan for New Types"
-  echo "    5. Admin → Settings → Auth → add API keys"
-  echo ""
-  echo "  ${YELLOW}For production:${NC}"
-  echo "    Edit .env to set TZ, MAP_LAT, MAP_LNG, PUBLIC_MAP_BASE_URL"
-  echo -e "${GREEN}══════════════════════════════════════════════${NC}"
+printf "%b\n" "  ${YELLOW}First-time setup:${NC}"
+echo "    1. Log in and change the admin password"
+echo "    2. Admin → Location Config → add your dispatch areas"
+echo "    3. Admin → Settings → Plugins → Geocoder → Enable"
+echo "    4. Admin → Call Types → Scan for New Types"
+echo "    5. Admin → Settings → Auth → add API keys"
+echo ""
+printf "%b\n" "  ${YELLOW}For production:${NC}"
+echo "    Edit .env to set TZ, MAP_LAT, MAP_LNG, PUBLIC_MAP_BASE_URL"
+printf "%b\n" "${GREEN}══════════════════════════════════════════════${NC}"
