@@ -123,3 +123,5 @@ __pycache__/
 
 # ── PM2 process files ───────────────────────────────────────────
 ecosystem.config.js
+server/themes/default/public/dist/
+themes/default/public/dist/
