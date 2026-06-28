@@ -937,7 +937,6 @@ router.route('/capcodes')
         .modify(function (queryBuilder) {
           if (id == null) {
             queryBuilder.insert({
-              id: id,
               address: address,
               alias: alias,
               agency: agency,
