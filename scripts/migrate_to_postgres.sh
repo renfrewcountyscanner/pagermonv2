@@ -70,10 +70,22 @@ grep -v 'sqlite_sequence\|sqlite_stat\|messages_search_index\|tr_log_messages' \
 
 echo 'COMMIT;' >> /tmp/pagermon_pg_import.sql
 
+# Add missing columns for capcodes (match_type) and messages (search_vector)
+# SQLite dump produces INSERT INTO t VALUES(…) with old column counts;
+# PostgreSQL needs values for all columns added by later migrations.
+sed -i \
+  -e "s/INSERT INTO capcodes VALUES(\(.*\)));/INSERT INTO capcodes VALUES(\1, 'address');/g" \
+  -e "s/INSERT INTO messages VALUES(\(.*\)));/INSERT INTO messages VALUES(\1, NULL);/g" \
+  /tmp/pagermon_pg_import.sql
+
 # ── Import into PostgreSQL ──────────────────────────────────────
 log "Importing into PostgreSQL..."
-_docker_compose exec -T postgres psql -U "$PG_USER" -d "$PG_DB" \
-  < /tmp/pagermon_pg_import.sql 2>&1 | grep -v "^psql:" | head -5 || true
+_IMPORT_OUT="$(_docker_compose exec -T postgres psql -U "$PG_USER" -d "$PG_DB" \
+  < /tmp/pagermon_pg_import.sql 2>&1)" || true
+_IMPORT_ERRS=$(echo "$_IMPORT_OUT" | grep -i "ERROR\|FATAL" | head -20)
+if [ -n "$_IMPORT_ERRS" ]; then
+  die "Import errors detected:\n$_IMPORT_ERRS"
+fi
 
 # ── Fix sequences ───────────────────────────────────────────────
 log "Resetting sequences..."

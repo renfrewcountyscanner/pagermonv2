@@ -169,8 +169,12 @@ async function save() {
   })
   if (r.ok) {
     if (isNew) {
-      const d = await r.json()
-      router.replace(`/admin/aliases/${d.id || d}`)
+      try {
+        const d = await r.json()
+        router.replace(`/admin/aliases/${d.id || d}`)
+      } catch {
+        router.replace('/admin/aliases')
+      }
     }
     justSaved.value = true
     setTimeout(function() { justSaved.value = false }, 2000)

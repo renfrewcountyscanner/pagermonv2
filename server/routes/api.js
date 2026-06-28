@@ -964,7 +964,7 @@ router.route('/capcodes')
         .returning('id')
         .then((result) => {
           res.status(200);
-          res.send('' + result);
+          res.json({ id: Array.isArray(result) ? result[0]?.id : result, status: 'ok' });
           if (!updateRequired || updateRequired == 0) {
             nconf.set('database:aliasRefreshRequired', 1);
             nconf.save();
