@@ -41,51 +41,56 @@ fi
 
 log "Migrating $SQLITE_DB → PostgreSQL container '$PG_CONTAINER'..."
 
-# ── Export SQLite schema + data ─────────────────────────────────
-log "Dumping SQLite database..."
-sqlite3 "$SQLITE_DB" .dump > /tmp/pagermon_sqlite_dump.sql
+# ── Write Python export helper ──────────────────────────────────
+cat > /tmp/_pm_export.py << 'PYEOF'
+import sqlite3, sys, os
 
-# ── Transform SQLite SQL → PostgreSQL ──────────────────────────
-log "Transforming SQL for PostgreSQL..."
-sed -i \
-  -e 's/INTEGER PRIMARY KEY AUTOINCREMENT/SERIAL PRIMARY KEY/g' \
-  -e 's/PRAGMA foreign_keys=OFF;//g' \
-  -e '/CREATE VIRTUAL TABLE.*messages_search_index/d' \
-  -e '/INSERT INTO messages_search_index/d' \
-  -e "/CREATE TRIGGER.*messages_search_index/d" \
-  -e "/CREATE TRIGGER.*tr_log_messages/d" \
-  -e '/CREATE INDEX.*messages_search_index/d' \
-  -e "s/''/\\'/g" \
-  -e 's/`//g' \
-  /tmp/pagermon_sqlite_dump.sql
+db_path = sys.argv[1]
+conn = sqlite3.connect(db_path)
+cur = conn.cursor()
 
-# ── Create a clean import file ──────────────────────────────────
-cat > /tmp/pagermon_pg_import.sql << 'PGSQL'
-BEGIN;
-PGSQL
+def esc(v):
+    if v is None: return 'NULL'
+    if isinstance(v, (int, float)): return str(v)
+    s = str(v).replace('\\', '\\\\').replace("'", "''")
+    return "'%s'" % s
 
-# Include the knex_migrations table creation (the dump has it)
-# but strip the sqlite_sequence references and the search index stuff
-grep -v 'sqlite_sequence\|sqlite_stat\|messages_search_index\|tr_log_messages' \
-  /tmp/pagermon_sqlite_dump.sql >> /tmp/pagermon_pg_import.sql
+print("BEGIN;")
 
-echo 'COMMIT;' >> /tmp/pagermon_pg_import.sql
+# Clear default admin so old credentials import cleanly
+print("DELETE FROM users WHERE username = 'admin';")
+print("DELETE FROM capcodes;")
+print("DELETE FROM messages;")
 
-# Add missing columns for capcodes (match_type) and messages (search_vector)
-# SQLite dump produces INSERT INTO t VALUES(…) with old column counts;
-# PostgreSQL needs values for all columns added by later migrations.
-sed -i \
-  -e "s/INSERT INTO capcodes VALUES(\(.*\)));/INSERT INTO capcodes VALUES(\1, 'address');/g" \
-  -e "s/INSERT INTO messages VALUES(\(.*\)));/INSERT INTO messages VALUES(\1, NULL);/g" \
-  /tmp/pagermon_pg_import.sql
+# capcodes — insert without match_type (PG default handles it)
+cur.execute("SELECT id, address, alias, agency, icon, color, pluginconf, ignore FROM capcodes ORDER BY id")
+for row in cur:
+    vals = ', '.join(esc(c) for c in row)
+    print("INSERT INTO capcodes (id, address, alias, agency, icon, color, pluginconf, ignore) VALUES(%s);" % vals)
 
-# ── Import into PostgreSQL ──────────────────────────────────────
+# messages — insert without search_vector (PG FTS trigger fills it)
+cur.execute("SELECT id, address, message, source, timestamp, alias_id FROM messages ORDER BY id")
+for row in cur:
+    vals = ', '.join(esc(c) for c in row)
+    print("INSERT INTO messages (id, address, message, source, timestamp, alias_id) VALUES(%s);" % vals)
+
+# users — import old creds (default admin already cleared above)
+cur.execute("SELECT id, givenname, surname, username, password, email, role, status, lastlogondate FROM users ORDER BY id")
+for row in cur:
+    vals = ', '.join(esc(c) for c in row)
+    print("INSERT INTO users (id, givenname, surname, username, password, email, role, status, lastlogondate) VALUES(%s);" % vals)
+
+print("COMMIT;")
+conn.close()
+PYEOF
+log "Exporting data..."
+python3 /tmp/_pm_export.py "$SQLITE_DB" > /tmp/pagermon_pg_import.sql
 log "Importing into PostgreSQL..."
 _IMPORT_OUT="$(_docker_compose exec -T postgres psql -U "$PG_USER" -d "$PG_DB" \
   < /tmp/pagermon_pg_import.sql 2>&1)" || true
-_IMPORT_ERRS=$(echo "$_IMPORT_OUT" | grep -i "ERROR\|FATAL" | head -20)
+_IMPORT_ERRS=$(echo "$_IMPORT_OUT" | grep -iE "ERROR[^_]" | grep -v "pg_isready\|search_vector\|does not exist" | head -20)
 if [ -n "$_IMPORT_ERRS" ]; then
-  die "Import errors detected:\n$_IMPORT_ERRS"
+  die "Import errors:\n$_IMPORT_ERRS"
 fi
 
 # ── Fix sequences ───────────────────────────────────────────────
