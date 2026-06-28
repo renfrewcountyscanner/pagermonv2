@@ -93,3 +93,9 @@ services:
         condition: service_healthy
     profiles:
       - client
+
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
