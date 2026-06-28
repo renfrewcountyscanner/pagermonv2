@@ -56,6 +56,7 @@ sed -i \
   -e "/CREATE TRIGGER.*tr_log_messages/d" \
   -e '/CREATE INDEX.*messages_search_index/d' \
   -e "s/''/\\'/g" \
+  -e 's/`//g' \
   /tmp/pagermon_sqlite_dump.sql
 
 # ── Create a clean import file ──────────────────────────────────
