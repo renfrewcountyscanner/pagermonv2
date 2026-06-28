@@ -976,7 +976,10 @@ router.route('/capcodes')
         })
       logger.main.debug(util.format('%o', req.body || 'no request body'));
     } else {
-      res.status(500).json({ message: 'Error - address or alias missing' });
+      var missing = [];
+      if (!req.body.address) missing.push('address');
+      if (!req.body.alias) missing.push('alias');
+      res.status(400).json({ error: 'Required field' + (missing.length > 1 ? 's' : '') + ' missing: ' + missing.join(', ') });
     }
   });
 

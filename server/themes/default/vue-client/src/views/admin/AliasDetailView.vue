@@ -23,9 +23,9 @@
             </div>
           </div>
           <div v-if="form.match_type !== 'apikey'" class="col-md-6">
-            <label class="form-label">Address / Pattern</label>
+            <label class="form-label">Address / Pattern <span class="text-danger">*</span></label>
             <input v-model="form.address" type="text" class="form-control font-monospace" required placeholder="e.g. 1234567 or 123456_" />
-            <div class="form-text">Use _ as a wildcard.</div>
+            <div class="form-text">Use _ as a wildcard. Required.</div>
           </div>
           <div v-else class="col-md-6">
             <label class="form-label">API Key</label>
@@ -36,8 +36,8 @@
             <div class="form-text">Defined in Admin → Settings → API Keys.</div>
           </div>
           <div class="col-md-6">
-            <label class="form-label">Alias</label>
-            <input v-model="form.alias" type="text" class="form-control" placeholder="Friendly name" />
+            <label class="form-label">Alias <span class="text-danger">*</span></label>
+            <input v-model="form.alias" type="text" class="form-control" required placeholder="Friendly name" />
           </div>
           <div class="col-md-6">
             <label class="form-label">Agency</label>
@@ -180,7 +180,12 @@ async function save() {
     setTimeout(function() { justSaved.value = false }, 2000)
     addToast('Alias saved')
   } else {
-    error.value = 'Failed to save. Check the fields and try again.'
+    try {
+      const errBody = await r.json().catch(() => null)
+      error.value = errBody?.error || errBody?.message || 'Failed to save. Check the fields and try again.'
+    } catch {
+      error.value = 'Failed to save. Check the fields and try again.'
+    }
     addToast('Save failed', 'danger')
   }
   busy.value = false
