@@ -83,19 +83,13 @@
 <script setup>
 import { ref, computed, onMounted, provide } from 'vue'
 import { useAuthStore } from './stores/auth.js'
+import { useTheme } from './composables/useTheme.js'
 
 const auth = useAuthStore()
+const { isDark: dark, toggleDark, initTheme } = useTheme()
 
-const dark = ref(localStorage.getItem('pm-theme') === 'dark')
 const toasts = ref([])
 let toastId = 0
-
-function toggleDark() {
-  dark.value = !dark.value
-  const theme = dark.value ? 'dark' : 'light'
-  document.documentElement.setAttribute('data-theme', theme)
-  localStorage.setItem('pm-theme', theme)
-}
 
 function addToast(msg, type = 'success', duration = 4000) {
   const id = ++toastId
@@ -116,9 +110,7 @@ const username = computed(() => auth.user?.username || '')
 const registrationEnabled = ref(false)
 
 onMounted(async () => {
-  const saved = localStorage.getItem('pm-theme') || 'light'
-  document.documentElement.setAttribute('data-theme', saved)
-  dark.value = saved === 'dark'
+  initTheme()
 
   await auth.fetchMe()
 

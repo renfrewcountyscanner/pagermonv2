@@ -54,7 +54,7 @@
         <span class="ll-ts">{{ formatTime(e.ts) }}</span>
         <span v-if="e.source" class="ll-src">{{ e.source }}</span>
         <span v-if="e.address" class="ll-cap">{{ e.address }}</span>
-        <span v-if="e.agency" class="ll-agency" :style="e.color ? { color: e.color } : {}">[{{ e.agency }}]</span>
+        <span v-if="e.agency" class="ll-agency" :style="e.color ? { color: themeAwareColor(e.color) } : {}">[{{ e.agency }}]</span>
         <span v-if="e.alias" class="ll-alias">{{ e.alias }}</span>
         <span class="ll-msg">{{ e.message }}</span>
       </div>
@@ -64,6 +64,9 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
+import { useTheme } from '../composables/useTheme.js'
+
+const { themeAwareColor } = useTheme()
 
 const entries = ref([])
 const buffer = ref([])

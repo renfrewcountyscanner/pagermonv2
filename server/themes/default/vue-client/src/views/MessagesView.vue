@@ -129,7 +129,7 @@
               <span v-if="msg.agency" class="agency-badge" :style="agencyStyle(msg)">{{ msg.agency }}</span>
             </td>
             <td class="alias-col hide-mobile small">
-              <i v-if="msg.icon" :class="`bi bi-${msg.icon} me-1`" :style="{ color: msg.color }"></i>
+              <i v-if="msg.icon" :class="`bi bi-${msg.icon} me-1`" :style="{ color: themeAwareColor(msg.color) }"></i>
               {{ msg.alias }}
             </td>
             <td class="msg-text">
@@ -225,8 +225,10 @@
 import { ref, computed, onMounted, onUnmounted, inject } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSocket } from '../composables/useSocket.js'
+import { useTheme } from '../composables/useTheme.js'
 
 const route = useRoute()
+const { themeAwareColor } = useTheme()
 const router = useRouter()
 const addToast = inject('toast', () => {})
 const retriggering = ref(null)
