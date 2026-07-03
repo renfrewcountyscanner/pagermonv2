@@ -8,6 +8,11 @@ export function useTheme() {
     const theme = value ? 'dark' : 'light'
     document.documentElement.setAttribute('data-theme', theme)
     document.documentElement.setAttribute('data-bs-theme', theme)
+    if (theme === 'dark') {
+      document.documentElement.style.colorScheme = 'dark'
+    } else {
+      document.documentElement.style.colorScheme = ''
+    }
   }
 
   function toggleDark() {

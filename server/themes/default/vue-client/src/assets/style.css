@@ -26,7 +26,21 @@
   --pm-row-hover: rgba(255,255,255,0.05);
 }
 
-/* Ensure Bootstrap text utilities stay readable in dark mode */
+/* --- Dark mode: body + global text --- */
+body {
+  background-color: var(--pm-bg);
+  color: var(--pm-text);
+  padding-top: 56px;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+[data-theme="dark"] body,
+[data-theme="dark"] .app-body {
+  background-color: var(--pm-bg) !important;
+  color: var(--pm-text) !important;
+}
+
+/* --- Dark mode: Bootstrap text utilities --- */
 [data-theme="dark"] .text-muted { color: var(--pm-text-muted) !important; }
 [data-theme="dark"] .text-dark { color: var(--pm-text) !important; }
 [data-theme="dark"] .text-black { color: #fff !important; }
@@ -39,16 +53,17 @@
 [data-theme="dark"] .text-danger,
 [data-theme="dark"] .text-light { color: inherit !important; }
 
-body {
-  background-color: var(--pm-bg);
-  color: var(--pm-text);
-  padding-top: 56px;
-  transition: background-color 0.2s, color 0.2s;
+/* --- Dark mode: table cells --- */
+[data-theme="dark"] .table {
+  --bs-table-color: var(--pm-text);
+  --bs-table-striped-color: var(--pm-text);
+  --bs-table-active-color: var(--pm-text);
+  --bs-table-hover-color: var(--pm-text);
 }
-
-[data-theme="dark"] body,
-[data-theme="dark"] .app-body {
-  background-color: var(--pm-bg) !important;
+[data-theme="dark"] .table td,
+[data-theme="dark"] .table th,
+[data-theme="dark"] td,
+[data-theme="dark"] th {
   color: var(--pm-text) !important;
 }
 
