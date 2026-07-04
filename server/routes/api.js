@@ -348,7 +348,13 @@ router.route('/messages')
         var datetime = data.datetime ? Math.floor(Number(data.datetime)) : Math.floor(Date.now() / 1000);
         var timeDiff = datetime - dupeTime;
         // if duplicate filtering is enabled, we want to populate the message buffer and check for duplicates within the limits
-        var matches = _.where(msgBuffer, { message: data.message, address: data.address });
+        var matches = msgBuffer.filter(function(msg) {
+          return msg.address === data.address && (
+            msg.message === data.message ||
+            data.message.startsWith(msg.message) ||
+            msg.message.startsWith(data.message)
+          );
+        });
         if (matches.length > 0) {
           if (dupeTime != 0) {
             // search the matching messages and see if any match the time constrain
@@ -412,7 +418,6 @@ router.route('/messages')
                       .as('temp_tab')
                   })
               })
-                .andWhere('message', '=', message)
                 .andWhere('address', '=', address)
             } else if ((dupeLimit != 0) && (dupeTime == 0)) {
               queryBuilder.where('id', 'in', function () {
@@ -426,7 +431,6 @@ router.route('/messages')
                       .as('temp_tab')
                   })
               })
-                .andWhere('message', '=', message)
                 .andWhere('address', '=', address)
             } else if ((dupeLimit == 0) && (dupeTime != 0)) {
               queryBuilder.where('id', 'in', function () {
@@ -434,15 +438,18 @@ router.route('/messages')
                   .from('messages')
                   .where('timestamp', '>', timeDiff)
               })
-                .andWhere('message', '=', message)
                 .andWhere('address', '=', address)
             } else {
-              queryBuilder.where('message', '=', message)
-                .andWhere('address', '=', address)
+              queryBuilder.where('address', '=', address)
             }
           })
           .then((row) => {
-            if (row.length > 0 && filterDupes && !isRetrigger) {
+            var isDup = row.length > 0 && row.some(function(r) {
+              return r.message === message ||
+                message.startsWith(r.message) ||
+                r.message.startsWith(message);
+            });
+            if (isDup && filterDupes && !isRetrigger) {
               logger.main.info(util.format('Ignoring duplicate: %o', message));
               res.status(200);
               res.send('Ignoring duplicate');

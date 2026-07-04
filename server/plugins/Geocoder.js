@@ -226,7 +226,6 @@ function insertPagerCall(parsed, geoResult, typeInfo, config, messageText, msgTi
     ? db('pager_calls')
         .select('call_id')
         .where('address', parsed.address)
-        .where('raw_text', messageText)
         .where('created_at', '>', msgTimestamp - (dedupWindow * 60))
         .limit(1)
     : Promise.resolve([]);
@@ -287,6 +286,7 @@ function insertPagerCall(parsed, geoResult, typeInfo, config, messageText, msgTi
       created_at: msgTimestamp,
         processed: geoResult ? 1 : 0,
       }, config);
+      return callId;
     }).catch(function (err) {
       logger.main.error('Geocoder: Failed to insert pager_call: ' + err.message);
     });
@@ -341,12 +341,13 @@ function getDefaultForType(raw) {
   return                             { category: 'Other',      color: '#6c757d', pin_letter: 'O' };
 }
 
-function buildMapImageUrl(lat, lng, category, color) {
+function buildMapImageUrl(lat, lng, category, color, zoom) {
   nconf.load();
   var baseUrl = nconf.get('publicmap:baseurl') || 'http://127.0.0.1:5000';
   var cat = category || 'Other';
   var url = baseUrl + '/map-image?lat=' + lat + '&lng=' + lng + '&incident=' + encodeURIComponent(cat);
   if (color) url += '&color=' + encodeURIComponent(color);
+  if (zoom) url += '&zoom=' + zoom;
   return url;
 }
 
@@ -403,10 +404,14 @@ function run(trigger, scope, data, config, callback) {
 
       resolveIncidentType(parsed.incident_type, msgTimestamp, isRetrigger).then(function (typeInfo) {
         if (geoResult) {
-          mapImageUrl = buildMapImageUrl(geoResult.lat, geoResult.lng, typeInfo.category, typeInfo.color);
+          mapImageUrl = buildMapImageUrl(geoResult.lat, geoResult.lng, typeInfo.category, typeInfo.color, config.mapZoom);
         }
-        insertPagerCall(parsed, geoResult, typeInfo, config, messageText, msgTimestamp, data).then(function () {
+        insertPagerCall(parsed, geoResult, typeInfo, config, messageText, msgTimestamp, data).then(function (callId) {
           data.pluginData = data.pluginData || {};
+          if (callId) {
+            data.pluginData.call_id = callId;
+            data.call_id = callId;
+          }
           if (geoResult) {
             data.pluginData.geocoded = true;
             data.pluginData.lat = geoResult.lat;

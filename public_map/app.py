@@ -160,8 +160,10 @@ def health():
 
 # ── Map Image Renderer ─────────────────────────────────────────────
 
-def render_map_png(lat, lng, incident="Other", color=None):
+def render_map_png(lat, lng, incident="Other", color=None, zoom=None):
     cfg = MapPinConfig()
+    if zoom is not None:
+        cfg.zoom = zoom
     renderer = MapPinRenderer(config=cfg, logger=logger)
     return renderer.render_png(lat=lat, lon=lng, incident_category=incident, color=color)
 
@@ -175,6 +177,7 @@ def map_image():
     lng_raw = request.args.get("lng")
     incident = request.args.get("incident", "Other").strip()
     color = request.args.get("color", "").strip() or None
+    zoom_raw = request.args.get("zoom", "").strip() or None
 
     if not lat_raw or not lng_raw:
         return {"success": False, "message": "lat and lng are required"}, 400
@@ -188,8 +191,17 @@ def map_image():
     if not (-90.0 <= lat <= 90.0) or not (-180.0 <= lng <= 180.0):
         return {"success": False, "message": "lat/lng out of bounds"}, 400
 
+    zoom = None
+    if zoom_raw:
+        try:
+            zoom = int(zoom_raw)
+            if zoom < 1 or zoom > 19:
+                return {"success": False, "message": "zoom must be between 1 and 19"}, 400
+        except (TypeError, ValueError):
+            return {"success": False, "message": "Invalid zoom"}, 400
+
     try:
-        png_bytes = render_map_png(lat, lng, incident, color)
+        png_bytes = render_map_png(lat, lng, incident, color, zoom)
     except Exception as e:
         logger.warning("Map render failed: %s", e)
         return {"success": False, "message": "Map render failed"}, 500

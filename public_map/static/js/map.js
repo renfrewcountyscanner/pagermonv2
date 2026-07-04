@@ -25,6 +25,8 @@ var desktopNotifEnabled = false;
 var notifUnreadCount = 0;
 var notifList = [];
 var testCallId = -1;
+var pendingPermalinkCallId = null;
+var permalinkHandled = false;
 
 function init() {
     initAudioContext();
@@ -168,7 +170,16 @@ function loadCalls() {
             if (data.success) {
                 currentCalls = data.result || [];
                 updateLastCallId();
-                applyFilters();
+                if (pendingPermalinkCallId != null) {
+                    console.log('[pagermon] loadCalls: permalink pending, skipFitBounds, handled:', permalinkHandled);
+                    applyFilters(true);
+                    if (!permalinkHandled) {
+                        handlePermalink(pendingPermalinkCallId);
+                        permalinkHandled = true;
+                    }
+                } else {
+                    applyFilters();
+                }
             }
         }).catch(function(err) { console.error('Failed to load calls:', err); });
 }
@@ -405,6 +416,21 @@ function copyPermalink(callId) {
     navigator.clipboard.writeText(url).then(function() { showToastMsg('Link copied', 'success'); }).catch(function() { showToastMsg('Failed to copy', 'danger'); });
 }
 
+function handlePermalink(callId) {
+    console.log('[pagermon] handlePermalink called with callId:', callId, 'map:', !!map, 'currentCalls:', currentCalls.length);
+    var call = currentCalls.find(function(c) { return c.call_id === callId; });
+    if (call) {
+        console.log('[pagermon] Found in currentCalls, has lat/lng:', !!call.lat, !!call.lng, 'zoom to:', call.lat, call.lng);
+        showCallDetail(call);
+        if (call.lat && call.lng) map.setView([call.lat, call.lng], 16);
+        return;
+    }
+    console.log('[pagermon] Not in currentCalls, fetching from API...');
+    fetch('/api/calls/' + callId).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.success) { console.log('[pagermon] API fetch success, setView'); showCallDetail(d.result); if (d.result.lat && d.result.lng) map.setView([d.result.lat, d.result.lng], 16); }
+    }).catch(function(err) { console.error('[pagermon] API fetch failed:', err); });
+}
+
 function showToastMsg(message, type) {
     var toast = document.createElement('div');
     toast.className = 'toast-item';
@@ -489,9 +515,8 @@ function initControls() {
     var params = new URLSearchParams(window.location.search);
     var callId = params.get('call');
     if (callId) {
-        fetch('/api/calls/' + callId).then(function(r) { return r.json(); }).then(function(d) {
-            if (d.success) { showCallDetail(d.result); if (d.result.lat && d.result.lng) map.setView([d.result.lat, d.result.lng], 16); }
-        }).catch(function() {});
+        pendingPermalinkCallId = parseInt(callId, 10);
+        console.log('[pagermon] initControls: set pendingPermalinkCallId =', pendingPermalinkCallId);
     }
 }
 
