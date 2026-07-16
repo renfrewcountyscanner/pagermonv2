@@ -75,8 +75,9 @@ if (azureEnable) {
 }
 
 var dbinit = require('./db');
-    dbinit.init();
+var databaseReady = dbinit.init();
 var db = require('./knex/knex.js');
+var pluginOutbox = require('./lib/pluginOutbox');
 
 var passport = require('./auth/local');
 
@@ -85,6 +86,12 @@ var index = require('./routes/index');
 var admin = require('./routes/admin');
 var api = require('./routes/api');
 var auth = require('./routes/auth');
+
+if (process.env.NODE_ENV !== 'test') {
+  databaseReady.then(function () {
+    pluginOutbox.start();
+  });
+}
 
 // Validate critical security settings before starting
 var sessionSecret = nconf.get('global:sessionSecret');

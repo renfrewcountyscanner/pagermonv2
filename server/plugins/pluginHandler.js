@@ -20,6 +20,8 @@ function handle(trigger, scope, data, callback) {
     logger.main.debug('======================');
 
     async.eachOf(plugins, function(conf, plugin, cb) {
+        // skip remaining plugins if a filter plugin set ignore
+        if (data.pluginData && data.pluginData.ignore) return cb();
         logger.main.debug('======================');
         logger.main.debug(`plugin: ${plugin}`);
         // note: fs and require use different paths

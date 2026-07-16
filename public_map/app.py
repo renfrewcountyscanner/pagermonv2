@@ -234,9 +234,9 @@ def build_call_obj(r):
     lat = r.get("lat")
     lng = r.get("lng")
     is_corrected = False
-    if r.get("corrected_lat") is not None and r.get("corrected_lon") is not None:
+    if r.get("corrected_lat") is not None and r.get("corrected_lng") is not None:
         lat = float(r["corrected_lat"])
-        lng = float(r["corrected_lon"])
+        lng = float(r["corrected_lng"])
         is_corrected = True
 
     address = (r.get("corrected_address")

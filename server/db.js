@@ -3,7 +3,7 @@ var db = require('./knex/knex.js');
 
 function init() {
     if (process.env.NODE_ENV !== 'test') {
-        db.migrate.currentVersion().then(function (result) {
+        return db.migrate.currentVersion().then(function (result) {
             logger.main.info("Current DB version: " + result);
             logger.main.info('Checking for database upgrades');
             return db.migrate.latest();
@@ -17,6 +17,7 @@ function init() {
             logger.main.error('Error upgrading database: ' + err);
         });
     }
+    return Promise.resolve();
 }
 
 module.exports = {

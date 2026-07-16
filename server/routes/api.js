@@ -6,6 +6,7 @@ var bcrypt = require('bcryptjs');
 var util = require('util');
 var _ = require('underscore');
 var pluginHandler = require('../plugins/pluginHandler');
+var pluginOutbox = require('../lib/pluginOutbox');
 var logger = require('../log');
 var db = require('../knex/knex.js');
 var converter = require('json-2-csv');
@@ -546,7 +547,8 @@ router.route('/messages')
                           .then((row) => {
                             if (row.length > 0) {
                               row = row[0]
-                              // send data to pluginHandler after processing
+                              // Persist post-processing before notifying clients. This lets the
+                              // worker resume plugins after a server restart.
                               row.pluginData = data.pluginData;
 
                               if (row.pluginconf) {
@@ -554,10 +556,8 @@ router.route('/messages')
                               } else {
                                 row.pluginconf = {};
                               }
-                              logger.main.debug('afterMessage start');
-                              pluginHandler.handle('message', 'after', row, function (response) {
-                                logger.main.debug(util.format('%o', response));
-                                logger.main.debug('afterMessage done');
+                              pluginOutbox.enqueue(row).then(function () {
+                                pluginOutbox.processSoon();
                                 // remove the pluginconf object before firing socket message
                                 delete row.pluginconf;
                                 // broadcast to live-log SSE listeners (one publish per accepted page)
@@ -640,9 +640,12 @@ router.route('/messages')
                                     req.io.emit('messagePost', row);
                                   }
                                 }
+                                return res.status(200).send('' + result);
+                              }).catch((err) => {
+                                res.status(500).send(err);
+                                logger.main.error('Failed to enqueue plugin work: ' + err.message);
                               });
                             }
-                            res.status(200).send('' + result);
                           })
                           .catch((err) => {
                             res.status(500).send(err);

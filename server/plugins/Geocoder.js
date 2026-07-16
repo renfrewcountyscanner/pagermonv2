@@ -220,6 +220,7 @@ function pushToMap(callData, config) {
 
 function insertPagerCall(parsed, geoResult, typeInfo, config, messageText, msgTimestamp, pushData) {
   var isRetrigger = !!(pushData.pluginData && pushData.pluginData.retrigger);
+  if (pushData.pluginData && pushData.pluginData.ignore) return;
   var dedupEnabled = config.dedupEnable !== false && !isRetrigger && geoResult !== null;
   var dedupWindow = parseInt(config.dedupWindowMinutes, 10) || 15;
   var checkPromise = dedupEnabled
@@ -255,7 +256,7 @@ function insertPagerCall(parsed, geoResult, typeInfo, config, messageText, msgTi
       geocode_state: geoResult ? (geoResult.state || '') : '',
       geocode_county: geoResult ? (geoResult.county || '') : '',
       geocode_country: geoResult ? (geoResult.country || '') : '',
-      geocode_source: geoResult ? (geoResult.source || '') : 'no-address',
+      geocode_source: geoResult ? (geoResult.source || '') : (parsed.address ? 'no-results' : 'no-address'),
       category: cat,
       color: col,
       pin_letter: letr,
@@ -282,7 +283,7 @@ function insertPagerCall(parsed, geoResult, typeInfo, config, messageText, msgTi
         geocode_state: geoResult ? (geoResult.state || '') : '',
         geocode_county: geoResult ? (geoResult.county || '') : '',
         geocode_country: geoResult ? (geoResult.country || '') : '',
-        geocode_source: geoResult ? (geoResult.source || '') : 'no-address',
+        geocode_source: geoResult ? (geoResult.source || '') : (parsed.address ? 'no-results' : 'no-address'),
       created_at: msgTimestamp,
         processed: geoResult ? 1 : 0,
       }, config);
@@ -351,6 +352,11 @@ function buildMapImageUrl(lat, lng, category, color, zoom) {
   return url;
 }
 
+function truncate(str, len) {
+  if (!str) return '';
+  return str.length > len ? str.substring(0, len) + '...' : str;
+}
+
 function buildMapImagePlaceholderUrl() {
   nconf.load();
   var baseUrl = nconf.get('publicmap:baseurl') || 'http://127.0.0.1:5000';
@@ -359,6 +365,7 @@ function buildMapImagePlaceholderUrl() {
 
 function run(trigger, scope, data, config, callback) {
   if (!config.enable) return callback(data);
+  if (data.pluginData && data.pluginData.ignore) return callback(data);
 
   config.rateLimitMs = parseInt(config.rateLimitMs, 10) || 1100;
 
@@ -374,7 +381,7 @@ function run(trigger, scope, data, config, callback) {
   var parsed = parseMessage(messageText);
 
   if (!parsed.address) {
-    logger.main.debug('Geocoder: No address found in message from ' + source);
+    logger.main.info('Geocoder: FAILED [no-address] source=' + source + ' message="' + truncate(messageText, 120) + '"');
     insertPagerCall(parsed, null, null, config, messageText, msgTimestamp, data);
     return callback(data);
   }
@@ -393,7 +400,7 @@ function run(trigger, scope, data, config, callback) {
     geocodeNominatim(parsed.address, locationCtx, config).then(function (geoResult) {
       var mapImageUrl, placeholderUrl;
       if (!geoResult) {
-        logger.main.info('Geocoder: Geocoding failed for "' + parsed.address + '"');
+        logger.main.info('Geocoder: FAILED [no-results] address="' + parsed.address + '" incident="' + (parsed.incident_type || '') + '" sent_by=' + (parsed.sent_by || source) + ' source=' + source);
         placeholderUrl = buildMapImagePlaceholderUrl();
         data.pluginData = data.pluginData || {};
         data.pluginData.map_image_url = placeholderUrl;
@@ -428,7 +435,29 @@ function run(trigger, scope, data, config, callback) {
       });
     });
   }).catch(function (err) {
-    logger.main.error('Geocoder: Error: ' + err.message);
+    logger.main.error('Geocoder: FAILED [error] address="' + (parsed.address || '') + '" source=' + source + ' error=' + err.message);
+    db('pager_calls').insert({
+      address: parsed.address || '',
+      cross_streets: parsed.cross_streets || '',
+      alias: parsed.alias || '',
+      sent_by: parsed.sent_by || '',
+      incident_type: parsed.incident_type || '',
+      raw_text: messageText,
+      message_timestamp: parsed.timestamp || '',
+      lat: null,
+      lng: null,
+      formatted_address: '',
+      geocode_city: '',
+      geocode_state: '',
+      geocode_county: '',
+      geocode_country: '',
+      geocode_source: 'error',
+      category: 'Other',
+      color: '#6c757d',
+      pin_letter: 'O',
+      created_at: msgTimestamp,
+      processed: 0,
+    }).catch(function () {});
     callback(data);
   });
 }
