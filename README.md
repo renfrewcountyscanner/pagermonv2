@@ -1,6 +1,6 @@
 # PagerMon
 
-PagerMon is an API-driven client/server framework for receiving, parsing, storing, and displaying RF pager messages from [multimon-ng](https://github.com/EliasOenal/multimon-ng). It supports POCSAG, FLEX, and EAS message types.
+PagerMon is a self-hosted, API-driven framework for receiving, parsing, storing, and displaying RF pager messages from [multimon-ng](https://github.com/EliasOenal/multimon-ng). It supports POCSAG, FLEX, and EAS message types.
 
 The system includes a **real-time public map** with geocoded call locations, colored incident-type markers, a dynamic filter bar, and Socket.IO live updates.
 
@@ -17,6 +17,8 @@ The system includes a **real-time public map** with geocoded call locations, col
 - **14 built-in plugins** — Discord, Pushover, Prowl, Telegram, Slack, Gotify, ntfy, SMTP, Webhook (n8n/generic), Regex Filters, Shell, etc.
 - **Multi-user** with role-based access (admin/user)
 - **Configurable via web UI** — all settings editable without touching config files
+- **Operator workspace** — saved message views, quick links to related map calls, and timezone-aware timestamps
+- **Operational visibility** — plugin delivery queue status and retry controls for administrators
 - **Duplicate message filtering**
 - **WebSockets** (Socket.IO) and **Server-Sent Events** — near real-time updates
 - **Docker** — 3-container architecture (PostgreSQL + PagerMon + Public Map)
@@ -31,7 +33,9 @@ cd pagermonv2
 ./install.sh
 ```
 
-`install.sh` auto-generates `.env` with random secrets, builds Docker images, starts PostgreSQL + PagerMon + Live Map, and runs database migrations. No manual config needed for local testing.
+`install.sh` auto-generates `.env` with random secrets, installs missing Docker prerequisites when required, builds Docker images, starts PostgreSQL + PagerMon + Live Map, and runs database migrations. No manual configuration is needed for local testing.
+
+For an existing deployment, read [the setup guide](docs/Setup.md) before running the installer or upgrade commands. The installer creates or recreates application containers; it does not delete the bind-mounted data directories.
 
 For production: edit `.env` to set `TZ`, `MAP_LAT`, `MAP_LNG`, and `PUBLIC_MAP_BASE_URL` for your area, then `docker compose up -d`.
 
@@ -50,7 +54,7 @@ After running `./install.sh`, configure your instance:
 2. **Location context** — Go to **Admin → Location Config** and add entries for your pager sources (e.g. "MyCounty Fire" → City/County/State). This biases geocoding for accurate map pins.
 3. **Enable Geocoder** — Go to **Admin → Settings → Plugins → Geocoder → Enable**
 4. **Scan call types** — Go to **Admin → Call Types → Scan for New Types**. Edit colors and pin letters as desired.
-5. **Set up API keys** — Go to **Admin → Settings → Auth → add API keys for your POCSAG reader clients
+5. **Set up API keys** — Go to **Admin → Settings → Auth → API Keys** and add keys for your POCSAG reader clients.
 
 ### Environment Variables (`.env`)
 
@@ -58,9 +62,9 @@ After running `./install.sh`, configure your instance:
 |----------|----------|---------|-------------|
 | `PG_DATABASE` | Yes | `pagermon` | PostgreSQL database name |
 | `PG_USER` | Yes | `pagermon` | PostgreSQL user |
-| `PG_PASSWORD` | **Yes** | — | PostgreSQL password (set a strong one) |
-| `MAP_SECRET_KEY` | **Yes** | — | Flask secret for the map service |
-| `PUBLIC_MAP_API_KEY` | **Yes** | — | Shared key between PagerMon and the map service |
+| `PG_PASSWORD` | **Yes** | auto-generated | PostgreSQL password |
+| `MAP_SECRET_KEY` | **Yes** | auto-generated | Flask secret for the map service |
+| `PUBLIC_MAP_API_KEY` | **Yes** | auto-generated | Shared key between PagerMon and the map service |
 | `PUBLIC_MAP_BASE_URL` | No | `http://localhost:5000` | Public URL of the map (used for n8n/Discord map image links) |
 | `SERVER_PORT` | No | `3000` | PagerMon web UI port |
 | `MAP_PORT` | No | `5000` | Public map port |
@@ -69,18 +73,20 @@ After running `./install.sh`, configure your instance:
 | `RTL_FREQ` | No | `148.5875M` | Frequency to monitor (client profile) |
 | `POCSAG_MODE` | No | `POCSAG512` | POCSAG decoding mode (client profile) |
 
+Copy `.env.example` to `.env` only for a manual deployment. Its passwords and keys are placeholders, not usable credentials. Never commit `.env`, `server-data/`, `client-data/`, `postgres-data/`, or `server/config/config.json`.
+
 ### Architecture
 
 ```
 docker compose up -d
          │
          ├── postgres:16-alpine     ← shared database (mandatory)
-         ├── pagermon:3000          ← Express + Vue SPA + API + plugins (mandatory)
-         ├── pagermon-map:5000      ← Flask + Leaflet + Socket.IO (mandatory)
+         ├── pagermon-server:3000   ← Express + Vue SPA + API + plugins (mandatory)
+         ├── public-map:5000        ← Flask + Leaflet + Socket.IO (mandatory)
          └── pagermon-client         ← RTL-SDR + multimon-ng (--profile client)
 ```
 
-**Three mandatory containers** (postgres, pagermon, pagermon-map). The client is optional and requires a physical RTL-SDR USB dongle.
+**Three mandatory containers** (`postgres`, `pagermon-server`, `public-map`). The client is optional and requires a physical RTL-SDR USB dongle.
 
 **Data persists** in bind-mounted directories under the project root:
 ```
@@ -103,8 +109,8 @@ docker compose --profile client up -d
 # Rebuild and restart
 docker compose build --no-cache && docker compose up -d
 
-# View logs
-docker compose logs -f pagermon
+# View PagerMon server logs
+docker compose logs -f pagermon-server
 
 # Stop everything
 docker compose down
@@ -263,6 +269,14 @@ docker compose up -d
 ## Support
 
 Bugs and feature requests: [GitHub Issues](https://github.com/renfrewcountyscanner/pagermonv2/issues)
+
+## Documentation
+
+- [Setup guide](docs/Setup.md)
+- [Map usage](docs/Map-Usage.md)
+- [Call types](docs/Call-Types.md)
+- [Plugins](docs/Plugins.md)
+- [Security policy](SECURITY.md)
 
 ## Contributing
 

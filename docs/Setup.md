@@ -8,11 +8,13 @@ cd pagermonv2
 ./install.sh
 ```
 
-`install.sh` auto-generates `.env` with random secrets and sensible defaults, builds Docker images, starts all services, and runs database migrations.
+`install.sh` auto-generates `.env` with random secrets and sensible defaults, installs missing Docker prerequisites when required, builds Docker images, starts all services, and runs database migrations. It may recreate PagerMon containers but does not delete the bind-mounted data directories.
 
 **No editing required** for local testing. The map will center at 0,0 until you set your area coordinates.
 
 ## Production Setup
+
+All values in `.env.example` are placeholders. Keep the generated `.env` private: it is ignored by Git along with runtime config and persistent data directories.
 
 Edit `.env` with values for your area:
 
@@ -82,8 +84,8 @@ For existing reader setups: configure the client to POST to `http://your-server:
 docker compose up -d
          │
          ├── postgres:16-alpine     ← shared database
-         ├── pagermon:3000          ← Express + Vue SPA + API
-         ├── pagermon-map:5000      ← Flask + Leaflet + Socket.IO
+         ├── pagermon-server:3000   ← Express + Vue SPA + API
+         ├── public-map:5000        ← Flask + Leaflet + Socket.IO
          └── pagermon-client         ← RTL-SDR + multimon-ng (--profile client)
 ```
 
@@ -124,8 +126,8 @@ docker compose --profile client up -d
 # Rebuild and restart
 docker compose build --no-cache && docker compose up -d
 
-# View logs
-docker compose logs -f pagermon
+# View PagerMon server logs
+docker compose logs -f pagermon-server
 
 # Stop everything
 docker compose down

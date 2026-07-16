@@ -1,3 +1,8 @@
+# Unreleased
+* **Public repository hygiene** — clarified configuration placeholders and protected local runtime data in the documentation.
+* **Documentation** — corrected Docker Compose service names and setup commands; documented the operator workspace and plugin delivery queue.
+* **Security automation** — added GitHub Actions secret scanning for `main` and pull requests.
+
 # 0.3.14 - 2025-06-26
 * **PostgreSQL migration** — default database backend is now PostgreSQL. SQLite support removed from server.
 * **Docker architecture** — 3 mandatory containers: postgres, pagermon-server, pagermon-public-map (client is optional profile).
