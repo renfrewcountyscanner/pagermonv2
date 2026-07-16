@@ -1,1 +1,6 @@
 themes/default/public/dist/
+node_modules/
+themes/default/vue-client/node_modules/
+themes/default/vue-client/dist/
+logs/
+config/config.json
