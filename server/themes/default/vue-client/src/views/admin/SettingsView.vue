@@ -2,13 +2,17 @@
   <div class="container py-4" style="max-width:780px;">
     <h5 class="fw-bold mb-4"><i class="bi bi-gear-fill me-2"></i>Settings</h5>
 
+    <div class="btn-group btn-group-sm mb-3" role="tablist" aria-label="Settings sections">
+      <button v-for="section in sections" :key="section.id" type="button" class="btn" :class="activeSection === section.id ? 'btn-primary' : 'btn-outline-secondary'" @click="activeSection = section.id">{{ section.label }}</button>
+    </div>
+
     <div v-if="saved" class="alert alert-success py-2">Settings saved. Some changes require a server restart.</div>
     <div v-if="error" class="alert alert-danger py-2">{{ error }}</div>
     <div v-if="loading" class="text-center py-5 text-muted"><i class="bi bi-arrow-clockwise spin fs-3"></i></div>
 
     <template v-if="!loading && config">
       <!-- Global -->
-      <div class="card shadow-sm mb-3">
+      <div v-show="activeSection === 'general'" class="card shadow-sm mb-3">
         <div class="card-header fw-semibold small">Global</div>
         <div class="card-body">
           <div class="row g-3">
@@ -67,7 +71,7 @@
       </div>
 
       <!-- Messages -->
-      <div class="card shadow-sm mb-3">
+      <div v-show="activeSection === 'messages'" class="card shadow-sm mb-3">
         <div class="card-header fw-semibold small">Messages</div>
         <div class="card-body">
           <div class="row g-3">
@@ -122,7 +126,7 @@
       </div>
 
       <!-- Deduplication -->
-      <div class="card shadow-sm mb-3">
+      <div v-show="activeSection === 'messages'" class="card shadow-sm mb-3">
         <div class="card-header d-flex align-items-center gap-2">
           <span class="fw-semibold small flex-grow-1">Notification Deduplication</span>
           <div class="form-check form-switch mb-0 ms-3">
@@ -148,7 +152,7 @@
       </div>
 
       <!-- Public Map -->
-      <div class="card shadow-sm mb-3">
+      <div v-show="activeSection === 'map'" class="card shadow-sm mb-3">
         <div class="card-header fw-semibold small">Public Map</div>
         <div class="card-body">
           <div class="row g-3">
@@ -167,7 +171,7 @@
       </div>
 
       <!-- Auth -->
-      <div class="card shadow-sm mb-3">
+      <div v-show="activeSection === 'access'" class="card shadow-sm mb-3">
         <div class="card-header fw-semibold small">Auth</div>
         <div class="card-body">
           <div class="form-check mb-3">
@@ -220,6 +224,7 @@
       </div>
 
       <!-- Plugins -->
+      <div v-show="activeSection === 'integrations'">
       <div class="d-flex align-items-center gap-2 mb-3">
         <span class="fw-bold small">Plugins</span>
         <input v-model="pluginFilter" type="text" class="form-control form-control-sm ms-auto" style="max-width:220px;" placeholder="Filter plugins…" />
@@ -261,6 +266,7 @@
           </div>
         </div>
       </div>
+      </div>
 
       <div class="d-flex gap-2 mt-3">
         <button class="btn btn-primary" :disabled="busy" @click="saveSettings">
@@ -283,6 +289,11 @@ const saved = ref(false)
 const justSaved = ref(false)
 const error = ref('')
 const plugins = ref([])
+const activeSection = ref('general')
+const sections = [
+  { id: 'general', label: 'General' }, { id: 'messages', label: 'Messages' }, { id: 'integrations', label: 'Integrations' },
+  { id: 'map', label: 'Map' }, { id: 'access', label: 'Access' }
+]
 const themes = ref([])
 const collapsed = ref({})
 const pluginFilter = ref('')

@@ -28,7 +28,7 @@
 
         <div class="top-center">
             <select id="timeRange">
-                <option value="midnight">Since Midnight (ET)</option>
+                <option value="midnight">Since Midnight</option>
                 <option value="3">Past 3 Hours</option>
                 <option value="6">Past 6 Hours</option>
                 <option value="12">Past 12 Hours</option>
@@ -37,6 +37,7 @@
                 <option value="72">Past 72 Hours</option>
                 <option value="custom">Custom Date</option>
             </select>
+            <select id="sourceFilter" title="Filter pager source"><option value="">All sources</option></select>
             <div id="customDateWrap" class="d-none">
                 <input type="date" id="dateFrom" title="From date">
                 <span class="range-sep">to</span>
@@ -66,6 +67,10 @@
     <div id="mainLayout">
         <div id="mapContainer">
             <div id="map"></div>
+            <aside id="callList" aria-label="Recent calls">
+                <div class="call-list-header"><span>Recent calls</span><span id="callListCount">0</span></div>
+                <div id="callListItems"></div>
+            </aside>
             <div id="legendPanel">
                 <div class="legend-title"><i class="bi bi-key-fill"></i> Legend</div>
                 <div id="legendItems"></div>
@@ -177,7 +182,7 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.heat/0.2.0/leaflet-heat.js"></script>
     <script src="https://cdn.socket.io/4.8.1/socket.io.min.js" crossorigin="anonymous"></script>
-    <script>window.MAP_CENTER = [{{ map_lat }}, {{ map_lng }}];</script>
+    <script>window.MAP_CENTER = [{{ map_lat }}, {{ map_lng }}]; window.MAP_TIMEZONE = {{ map_timezone | tojson }};</script>
     <script src="/static/js/map.js"></script>
     <script src="/static/js/help.js"></script>
 </body>

@@ -13,6 +13,15 @@
         <option v-for="n in [10,20,50,100]" :key="n" :value="n">{{ n }}</option>
       </select>
 
+      <select v-if="savedViews.length" v-model="activeSavedView" @change="applySavedView" class="form-select form-select-sm saved-view-select" title="Saved views">
+        <option value="">Saved views</option>
+        <option v-for="view in savedViews" :key="view.id" :value="String(view.id)">{{ view.name }}</option>
+      </select>
+      <div class="input-group input-group-sm saved-view-name">
+        <input v-model.trim="savedViewName" type="text" class="form-control" placeholder="Save view" @keyup.enter="saveView" />
+        <button class="btn btn-outline-secondary" @click="saveView" :disabled="!savedViewName" title="Save current filters"><i class="bi bi-bookmark-plus"></i></button>
+      </div>
+
       <button class="btn btn-sm btn-outline-secondary" @click="loadMessages" :disabled="loading" title="Refresh">
         <i class="bi bi-arrow-clockwise" :class="{ 'spin': loading }"></i>
       </button>
@@ -191,6 +200,8 @@
           <dd v-if="selected.agency" class="col-8">{{ selected.agency }}</dd>
           <dt v-if="selected.alias" class="col-4 text-muted">Alias</dt>
           <dd v-if="selected.alias" class="col-8">{{ selected.alias }}</dd>
+          <dt v-if="selected.pager_call_id" class="col-4 text-muted">Map call</dt>
+          <dd v-if="selected.pager_call_id" class="col-8"><a :href="mapCallUrl(selected)" target="_blank" rel="noopener">#{{ selected.pager_call_id }} <i class="bi bi-box-arrow-up-right"></i></a></dd>
         </dl>
         <div class="p-2 rounded mb-2" style="background:var(--pm-surface-alt); word-break:break-word; white-space:pre-wrap;">
           <span v-if="isTestMessage(selected)" class="badge bg-warning text-dark me-2" style="font-size:0.65rem;">TEST RETRIGGER</span>
@@ -207,6 +218,9 @@
             <i :class="retriggering === selected.id ? 'bi bi-arrow-repeat spin me-1' : 'bi bi-lightning-charge-fill me-1'"></i>
             {{ retriggering === selected.id ? 'Retriggering…' : 'Retrigger Notifications' }}
           </button>
+          <a v-if="selected.pager_call_id" :href="mapCallUrl(selected)" target="_blank" rel="noopener" class="btn btn-sm btn-outline-success" title="Open on live map">
+            <i class="bi bi-map"></i> Map
+          </a>
         </div>
         <div class="d-flex gap-2">
           <button class="btn btn-sm btn-outline-primary" @click="filterByAlias(selected)">
@@ -245,6 +259,11 @@ const selected     = ref(null)
 const newIds      = ref(new Set())
 const alertIds    = ref(new Set())
 const showToggles = ref(false)
+const savedViews = ref([])
+const activeSavedView = ref('')
+const savedViewName = ref('')
+const mapBaseUrl = ref('')
+const timezone = ref(Intl.DateTimeFormat().resolvedOptions().timeZone)
 
 const hideDuplicates = ref(localStorage.getItem('pm-hidedupes') === 'true')
 const audioEnabled   = ref(localStorage.getItem('pm-audio') !== 'false')
@@ -370,20 +389,63 @@ const visiblePages = computed(() => {
 function formatTime(ts) {
   if (!ts) return ''
   const d = new Date(ts * 1000)
-  const pad = n => String(n).padStart(2, '0')
-  const mo = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]
-  const dy = d.getDate()
-  const mi = pad(d.getMinutes())
-  const se = pad(d.getSeconds())
-  const h = d.getHours()
-  const ampm = h >= 12 ? 'p.m.' : 'a.m.'
-  const h12 = h % 12 || 12
-  return `${mo} ${dy}, ${h12}:${mi}:${se} ${ampm}`
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone.value, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', second: '2-digit'
+  }).format(d)
 }
 
 function formatFull(ts) {
   if (!ts) return ''
-  return new Date(ts * 1000).toLocaleString()
+  return new Date(ts * 1000).toLocaleString(undefined, { timeZone: timezone.value, timeZoneName: 'short' })
+}
+
+function mapCallUrl(msg) {
+  if (!msg?.pager_call_id || !mapBaseUrl.value) return '#'
+  return `${mapBaseUrl.value.replace(/\/$/, '')}/?call=${encodeURIComponent(msg.pager_call_id)}`
+}
+
+function currentViewState() {
+  return {
+    q: searchQuery.value, agency: route.query.agency || '', alias: route.query.alias || '', address: route.query.address || '',
+    from: dateFrom.value, to: dateTo.value, limit: limit.value, sort: sortField.value, dir: sortDir.value,
+    hideDuplicates: hideDuplicates.value,
+  }
+}
+
+async function loadSavedViews() {
+  try {
+    const r = await fetch('/api/saved-views?type=messages')
+    if (r.ok) savedViews.value = await r.json()
+  } catch (_) {}
+}
+
+async function saveView() {
+  if (!savedViewName.value) return
+  try {
+    const r = await fetch('/api/saved-views', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'messages', name: savedViewName.value, state: currentViewState() })
+    })
+    if (!r.ok) throw new Error()
+    savedViewName.value = ''
+    await loadSavedViews()
+    addToast('View saved')
+  } catch (_) { addToast('Unable to save view', 'danger') }
+}
+
+function applySavedView() {
+  const view = savedViews.value.find(v => String(v.id) === activeSavedView.value)
+  if (!view) return
+  const state = view.state || {}
+  searchQuery.value = state.q || ''
+  dateFrom.value = state.from || ''
+  dateTo.value = state.to || ''
+  limit.value = state.limit || limit.value
+  sortField.value = state.sort || 'timestamp'
+  sortDir.value = state.dir || 'desc'
+  hideDuplicates.value = !!state.hideDuplicates
+  router.replace({ path: '/', query: Object.fromEntries(Object.entries({ agency: state.agency, alias: state.alias, address: state.address, q: state.q }).filter(([, value]) => value)) })
+  loadMessages(true)
 }
 
 function agencyStyle(msg) {
@@ -600,6 +662,12 @@ onMounted(() => {
   window.addEventListener('resize', checkMobile)
   window.addEventListener('keydown', handleKeydown)
 
+  fetch('/api/appconfig').then(r => r.ok ? r.json() : null).then(config => {
+    if (!config) return
+    mapBaseUrl.value = config.mapBaseUrl || ''
+    timezone.value = config.timezone || timezone.value
+  }).catch(() => {})
+  loadSavedViews()
   loadMessages()
   connect(handleSocketMessage)
 })
@@ -611,6 +679,8 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.saved-view-select { max-width: 150px; }
+.saved-view-name { width: 145px; }
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 

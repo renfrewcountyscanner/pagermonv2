@@ -13,6 +13,7 @@ export function useTheme() {
     } else {
       document.documentElement.style.colorScheme = ''
     }
+    localStorage.setItem('pm-theme', theme)
   }
 
   function toggleDark() {

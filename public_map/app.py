@@ -51,6 +51,7 @@ if not PUBLIC_MAP_API_KEY:
     raise RuntimeError("PUBLIC_MAP_API_KEY is required. Set it in your .env file.")
 MAP_LAT = float(os.environ.get("MAP_LAT", "45.42"))
 MAP_LNG = float(os.environ.get("MAP_LNG", "-75.70"))
+MAP_TIMEZONE = os.environ.get("MAP_TIMEZONE", os.environ.get("TZ", "America/Toronto"))
 
 logging.basicConfig(
     level=logging.INFO,
@@ -140,7 +141,7 @@ def get_db():
 
 @app.route("/")
 def index():
-    return render_template("map.html", map_lat=MAP_LAT, map_lng=MAP_LNG)
+    return render_template("map.html", map_lat=MAP_LAT, map_lng=MAP_LNG, map_timezone=MAP_TIMEZONE)
 
 
 @app.route("/health")

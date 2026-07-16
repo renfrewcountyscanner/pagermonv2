@@ -173,7 +173,57 @@ router.get('/appconfig', function (req, res) {
     timezone: nconf.get('global:timezone') || 'America/Toronto',
     mapLat: nconf.get('global:mapLat') || 45.42,
     mapLng: nconf.get('global:mapLng') || -75.70,
+    mapBaseUrl: nconf.get('publicmap:baseurl') || '',
   });
+});
+
+function requireSessionUser(req, res, next) {
+  if (!req.isAuthenticated() || !req.user || !req.user.id) {
+    return res.status(401).json({ error: 'Session authentication required.' });
+  }
+  next();
+}
+
+router.route('/saved-views')
+  .get(requireSessionUser, function (req, res) {
+    var type = req.query.type || 'messages';
+    db('user_saved_views').where({ user_id: req.user.id, view_type: type }).orderBy('name')
+      .then(function (rows) {
+        res.json(rows.map(function (row) {
+          var state = {};
+          try { state = JSON.parse(row.state); } catch (_) {}
+          return { id: row.id, name: row.name, type: row.view_type, state: state, updatedAt: row.updated_at };
+        }));
+      }).catch(function (err) { logger.main.error(err); res.status(500).send(err); });
+  })
+  .post(requireSessionUser,
+    body('name').trim().isLength({ min: 1, max: 80 }).escape(),
+    function (req, res) {
+      var errors = validationResult(req);
+      if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
+      var timestamp = Math.floor(Date.now() / 1000);
+      var row = {
+        user_id: req.user.id,
+        view_type: req.body.type || 'messages',
+        name: req.body.name,
+        state: JSON.stringify(req.body.state || {}),
+        updated_at: timestamp,
+      };
+      db('user_saved_views').where({ user_id: row.user_id, view_type: row.view_type, name: row.name }).first()
+        .then(function (existing) {
+          if (existing) return db('user_saved_views').where('id', existing.id).update(row).then(function () { return existing.id; });
+          row.created_at = timestamp;
+          return db('user_saved_views').insert(row).returning('id').then(function (result) { return Array.isArray(result) ? result[0] : result; });
+        }).then(function (id) { res.status(200).json({ status: 'ok', id: id }); })
+        .catch(function (err) { logger.main.error(err); res.status(500).send(err); });
+    });
+
+router.delete('/saved-views/:id', requireSessionUser, function (req, res) {
+  db('user_saved_views').where({ id: req.params.id, user_id: req.user.id }).del()
+    .then(function (count) {
+      if (!count) return res.status(404).json({ error: 'Not found' });
+      res.json({ status: 'ok' });
+    }).catch(function (err) { logger.main.error(err); res.status(500).send(err); });
 });
 
 router.route('/messages')
@@ -513,7 +563,14 @@ router.route('/messages')
                   }
 
                   if (insert == true) {
-                    var insertmsg = { address: address, message: message, timestamp: datetime, source: source, alias_id: alias_id }
+                    var insertmsg = {
+                      address: address,
+                      message: message,
+                      timestamp: datetime,
+                      source: source,
+                      alias_id: alias_id,
+                      pager_call_id: data.pluginData && data.pluginData.call_id || null,
+                    }
                     if (isRetrigger) insertmsg.message = '[TEST RETRIGGER] ' + insertmsg.message;
                     db('messages').insert(insertmsg).returning('id')
                       .then((result) => {
@@ -1902,13 +1959,43 @@ router.get('/admin-stats', authHelper.isAdmin, function (req, res) {
     db('messages').count('* as count').where('timestamp', '>=', midnight),
     db('pager_calls').max('created_at as last_geocoded'),
     db('incident_types').count('* as count').where('active', 1),
+    db('plugin_outbox').select('status').count('* as count').groupBy('status'),
+    db('messages').select('source').max('timestamp as last_seen').count('* as count').groupBy('source').orderBy('last_seen', 'desc').limit(12),
   ]).then(function (r) {
+    var outbox = { pending: 0, retry: 0, failed: 0 };
+    r[4].forEach(function (row) { outbox[row.status] = parseInt(row.count, 10) || 0; });
     res.status(200).json({
       callsToday: parseInt(r[0][0].count) || 0,
       messagesToday: parseInt(r[1][0].count) || 0,
       lastGeocoded: r[2][0].last_geocoded || null,
       activeTypes: parseInt(r[3][0].count) || 0,
+      outbox: outbox,
+      sources: r[5].map(function (row) {
+        return { source: row.source || 'Unknown', lastSeen: row.last_seen || null, messages: parseInt(row.count, 10) || 0 };
+      }),
     });
+  }).catch(function (err) { logger.main.error(err); res.status(500).send(err); });
+});
+
+router.get('/admin/operations/outbox', authHelper.isAdmin, function (req, res) {
+  var limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 50, 1), 200);
+  var query = db('plugin_outbox')
+    .leftJoin('messages', 'messages.id', 'plugin_outbox.message_id')
+    .select('plugin_outbox.id', 'plugin_outbox.message_id', 'plugin_outbox.status', 'plugin_outbox.attempts', 'plugin_outbox.available_at', 'plugin_outbox.updated_at', 'plugin_outbox.last_error', 'messages.message', 'messages.source', 'messages.timestamp')
+    .orderBy('plugin_outbox.updated_at', 'desc').limit(limit);
+  if (req.query.status) query.where('plugin_outbox.status', req.query.status);
+  query.then(function (rows) { res.json(rows); })
+    .catch(function (err) { logger.main.error(err); res.status(500).send(err); });
+});
+
+router.post('/admin/operations/outbox/:id/retry', authHelper.isAdmin, function (req, res) {
+  var timestamp = Math.floor(Date.now() / 1000);
+  db('plugin_outbox').where('id', req.params.id).update({
+    status: 'pending', attempts: 0, available_at: timestamp, locked_at: null, updated_at: timestamp, last_error: null,
+  }).then(function (count) {
+    if (!count) return res.status(404).json({ error: 'Not found' });
+    pluginOutbox.processSoon();
+    res.json({ status: 'ok' });
   }).catch(function (err) { logger.main.error(err); res.status(500).send(err); });
 });
 

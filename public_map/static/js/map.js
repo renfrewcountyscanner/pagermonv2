@@ -96,15 +96,16 @@ function addLightTiles() {
     }).addTo(map);
 }
 
-function torontoMidnightEpoch() {
-    var parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Toronto', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+function localMidnightEpoch() {
+    var timeZone = window.MAP_TIMEZONE || 'America/Toronto';
+    var parts = new Intl.DateTimeFormat('en-CA', { timeZone: timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
     var y = parts.find(function(p) { return p.type === 'year'; }).value;
     var m = parts.find(function(p) { return p.type === 'month'; }).value;
     var d = parts.find(function(p) { return p.type === 'day'; }).value;
     var tempDate = new Date(y + '-' + m + '-' + d + 'T00:00:00Z');
-    var torontoStr = tempDate.toLocaleString('en-US', { timeZone: 'America/Toronto' });
+    var localStr = tempDate.toLocaleString('en-US', { timeZone: timeZone });
     var utcStr = tempDate.toLocaleString('en-US', { timeZone: 'UTC' });
-    var offsetMs = new Date(utcStr).getTime() - new Date(torontoStr).getTime();
+    var offsetMs = new Date(utcStr).getTime() - new Date(localStr).getTime();
     return Math.floor((tempDate.getTime() + offsetMs) / 1000);
 }
 
@@ -131,7 +132,7 @@ function emitSubscribe() {
         if (dt) sub.to = Math.floor(new Date(dt + 'T23:59:59').getTime() / 1000);
         if (!sub.from && !sub.to) sub.hours = 24;
     } else if (tr.value === 'midnight') {
-        sub.from = torontoMidnightEpoch();
+        sub.from = localMidnightEpoch();
     } else {
         sub.hours = parseFloat(tr.value);
     }
@@ -157,7 +158,7 @@ function loadCalls() {
         if (dt) params.append('to', Math.floor(new Date(dt + 'T23:59:59').getTime() / 1000));
         if (!df && !dt) params.append('hours', '24');
     } else if (tr.value === 'midnight') {
-        params.append('from', torontoMidnightEpoch());
+        params.append('from', localMidnightEpoch());
     } else {
         params.append('hours', tr.value);
     }
@@ -169,6 +170,7 @@ function loadCalls() {
         .then(function(data) {
             if (data.success) {
                 currentCalls = data.result || [];
+                renderSourceFilter();
                 updateLastCallId();
                 if (pendingPermalinkCallId != null) {
                     console.log('[pagermon] loadCalls: permalink pending, skipFitBounds, handled:', permalinkHandled);
@@ -198,6 +200,7 @@ function getActiveCategories() {
 
 function applyFilters(skipFitBounds) {
     var activeCats = new Set(getActiveCategories());
+    var sourceFilter = document.getElementById('sourceFilter').value;
     var fromEpoch = null;
     var toEpoch = null;
     if (!isLiveFeed && document.getElementById('timeRange').value === 'custom') {
@@ -209,6 +212,7 @@ function applyFilters(skipFitBounds) {
     function passes(c) {
         var cat = c.category || 'Other';
         if (activeCats.size > 0 && !activeCats.has(cat)) return false;
+        if (sourceFilter && c.sent_by !== sourceFilter) return false;
         if (fromEpoch && c.timestamp < fromEpoch) return false;
         if (toEpoch && c.timestamp > toEpoch) return false;
         return true;
@@ -220,9 +224,47 @@ function applyFilters(skipFitBounds) {
         visibleCalls = currentCalls.filter(passes);
     }
     renderMarkers();
+    renderCallList();
     updateStats();
     updateTicker();
     if (!isLiveFeed && !skipFitBounds) fitBounds();
+}
+
+function renderSourceFilter() {
+    var select = document.getElementById('sourceFilter');
+    if (!select) return;
+    var selected = select.value;
+    var sources = Array.from(new Set(currentCalls.map(function(c) { return c.sent_by; }).filter(Boolean))).sort();
+    select.innerHTML = '<option value="">All sources</option>' + sources.map(function(source) {
+        return '<option value="' + esc(source) + '">' + esc(source) + '</option>';
+    }).join('');
+    select.value = sources.indexOf(selected) >= 0 ? selected : '';
+}
+
+function renderCallList() {
+    var items = document.getElementById('callListItems');
+    var count = document.getElementById('callListCount');
+    if (!items || !count) return;
+    count.textContent = visibleCalls.length;
+    var calls = visibleCalls.slice().sort(function(a, b) { return b.timestamp - a.timestamp; }).slice(0, 12);
+    if (!calls.length) {
+        items.innerHTML = '<div class="call-list-empty">No calls match the current filters.</div>';
+        return;
+    }
+    items.innerHTML = calls.map(function(call) {
+        return '<button class="call-list-item" data-call-id="' + call.call_id + '">' +
+          '<span class="call-list-dot" style="background:' + esc(call.color || '#6c757d') + '"></span>' +
+          '<span class="call-list-copy"><strong>' + esc(call.incident_type || call.category || 'Call') + '</strong><small>' + esc(call.address || 'No location') + '</small></span>' +
+          '<time>' + esc(formatTime(call.timestamp)) + '</time></button>';
+    }).join('');
+    items.querySelectorAll('[data-call-id]').forEach(function(button) {
+        button.addEventListener('click', function() {
+            var call = visibleCalls.find(function(c) { return String(c.call_id) === button.dataset.callId; });
+            if (!call) return;
+            showCallDetail(call);
+            panToCall(call);
+        });
+    });
 }
 
 function renderMarkers() {
@@ -493,6 +535,7 @@ function initControls() {
         else { wrap.classList.add('d-none'); loadCalls(); emitSubscribe(); }
     });
     document.getElementById('customDateApply').addEventListener('click', function() { loadCalls(); emitSubscribe(); });
+    document.getElementById('sourceFilter').addEventListener('change', function() { applyFilters(true); });
     document.getElementById('closeSidebar').addEventListener('click', closeSidebar);
     document.getElementById('fitBoundsBtn').addEventListener('click', fitBounds);
     document.getElementById('cancelAutoFit').addEventListener('click', cancelAutoFit);
