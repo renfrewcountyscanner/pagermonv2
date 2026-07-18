@@ -20,6 +20,7 @@ var lastCallId = 0;
 var selectedCallId = null;
 var isMuted = false;
 var isLiveFeed = false;
+var isCallListVisible = true;
 var autoFitTimer = null;
 var desktopNotifEnabled = false;
 var notifUnreadCount = 0;
@@ -543,6 +544,7 @@ function initControls() {
     document.getElementById('themeToggle').addEventListener('click', toggleTheme);
     document.getElementById('heatmapToggle').addEventListener('click', toggleHeatmap);
     document.getElementById('muteToggle').addEventListener('click', toggleMute);
+    document.getElementById('callListToggle').addEventListener('click', toggleCallList);
     document.getElementById('liveFeedToggle').addEventListener('click', toggleLiveFeed);
     document.getElementById('testBtn').addEventListener('click', injectTestCall);
     document.getElementById('helpBtn').addEventListener('click', toggleHelpModal);
@@ -598,6 +600,22 @@ function toggleMute() {
     localStorage.setItem('mapMuted', isMuted ? '1' : '0');
 }
 
+function setCallListVisibility(visible, persist) {
+    isCallListVisible = visible;
+    var panel = document.getElementById('callList');
+    var button = document.getElementById('callListToggle');
+    panel.classList.toggle('call-list-hidden', !visible);
+    button.setAttribute('aria-pressed', visible ? 'true' : 'false');
+    button.title = visible ? 'Hide recent calls' : 'Show recent calls';
+    button.setAttribute('aria-label', button.title);
+    button.classList.toggle('active', visible);
+    if (persist) localStorage.setItem('mapCallListVisible', visible ? '1' : '0');
+}
+
+function toggleCallList() {
+    setCallListVisibility(!isCallListVisible, true);
+}
+
 function toggleLiveFeed() {
     isLiveFeed = !isLiveFeed;
     var btn = document.getElementById('liveFeedToggle');
@@ -646,6 +664,7 @@ function restorePreferences() {
     if (savedTheme === 'light') { isDarkTheme = true; toggleTheme(); }
     var savedMute = localStorage.getItem('mapMuted');
     if (savedMute === '1') { isMuted = false; toggleMute(); }
+    if (localStorage.getItem('mapCallListVisible') === '0') setCallListVisibility(false, false);
 }
 
 document.addEventListener('DOMContentLoaded', function() { init(); restorePreferences(); });

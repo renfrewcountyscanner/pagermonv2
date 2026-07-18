@@ -363,6 +363,8 @@ html, body {
     backdrop-filter: blur(4px);
 }
 
+#callList.call-list-hidden { display: none; }
+
 .call-list-header {
     display: flex;
     justify-content: space-between;
